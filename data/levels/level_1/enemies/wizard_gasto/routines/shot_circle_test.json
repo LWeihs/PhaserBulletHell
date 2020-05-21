@@ -1,0 +1,35 @@
+{
+  "name": "ShotCircleTest",
+  "loops": true,
+  "hp": 300,
+  "duration": 240,
+
+  "moves": [
+    {
+      "type": "Randomized",
+      "times": [0, 180],
+      "x_acceleration": 0,
+      "y_acceleration": 0,
+      "x_velo_range": [-500, 500],
+      "y_velo_range": [-500, 500]
+    }
+  ],
+
+  "shots": [
+    {
+      "type": "ShotCircle",
+      "anchor": "Bottom",
+      "x_offset": 0,
+      "y_offset": 0,
+      "speeds": [200],
+      "shot_spread": true,
+      "degrees": [0],
+      "nr_shots": 12,
+      "shot_ids": ["gk_red", "gk_blue", "gk_green"],
+      "continuous": true,
+      "interval": 30,
+      "start_time": 0,
+      "radius": 200
+    }
+  ]
+}

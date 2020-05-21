@@ -1,0 +1,56 @@
+{
+  "name": "Gasto Cannon",
+  "loops": true,
+  "hp": 300,
+  "duration": 240,
+
+  "moves": [
+    {
+      "type": "FixedMoves",
+      "times": [0, 180],
+      "x_acceleration": 0,
+      "y_acceleration": 0,
+      "x_velo": 120,
+      "y_velo": 0
+    },
+    {
+      "type": "FixedMoves",
+      "times": [60],
+      "x_acceleration": 0,
+      "y_acceleration": 0,
+      "x_velo": -120,
+      "y_velo": 0
+    }
+  ],
+
+  "shots": [
+    {
+      "times": [0, 60, 120, 180],
+      "type": "ShotArray",
+      "anchor": "Bottom",
+      "shots": [
+        {
+          "shot_id": "gk_red",
+          "x_offset": 0,
+          "y_offset": 0,
+          "degree": 0,
+          "speed": 200
+        },
+        {
+          "shot_id": "gk_blue",
+          "x_offset": -10,
+          "y_offset": 0,
+          "degree": 340,
+          "speed": 200
+        },
+        {
+          "shot_id": "gk_green",
+          "x_offset": 10,
+          "y_offset": 0,
+          "degree": 20,
+          "speed": 200
+        }
+      ]
+    }
+  ]
+}

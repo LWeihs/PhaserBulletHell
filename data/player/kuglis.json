@@ -1,0 +1,11 @@
+{
+  "asset_folder": "kuglis",
+  "weapon": {
+    "fire_rate": 5,
+    "bullet_speed": 580
+  },
+  "movement": {
+    "normal": 840,
+    "slowed": 320
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "BulletHell",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.17.1",
+    "gulp": "^4.0.2",
+    "gulp-uglify-es": "^2.0.0"
+  },
+  "devDependencies": {
+    "gulp-rename": "^2.0.0",
+    "rollup": "^2.8.2"
+  }
+}

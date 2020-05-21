@@ -1,0 +1,9 @@
+{
+  "name": "Wizard Gasto",
+  "id": "wizard_gasto",
+  "routines": [
+    {
+      "name": "circle_test"
+    }
+  ]
+}

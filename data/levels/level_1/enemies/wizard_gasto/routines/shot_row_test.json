@@ -1,0 +1,24 @@
+{
+  "name": "ShotRowTest",
+  "loops": true,
+  "hp": 300,
+  "duration": 240,
+
+  "shots": [
+    {
+      "type": "ShotRow",
+      "anchor": "Bottom",
+      "continuous": true,
+      "interval": 30,
+      "start_time": 0,
+      "times": [0, 20, 40],
+      "shot_ids": ["gk_red", "gk_blue", "gk_green"],
+      "speeds": [200],
+      "degrees": [0],
+      "x_offset_start": -800,
+      "x_offset_end": 800,
+      "y_offset": 0,
+      "nr_shots": 100
+    }
+  ]
+}

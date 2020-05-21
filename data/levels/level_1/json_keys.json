@@ -1,0 +1,8 @@
+{
+  "wizard_gasto": "enemies/wizard_gasto/stats.json",
+  "wg_gasto_cannon": "enemies/wizard_gasto/routines/gasto_cannon.json",
+
+  "row_test": "enemies/wizard_gasto/routines/shot_row_test.json",
+  "circle_test": "enemies/wizard_gasto/routines/shot_circle_test.json",
+  "twister_test": "enemies/wizard_gasto/routines/shot_twister_test.json"
+}
