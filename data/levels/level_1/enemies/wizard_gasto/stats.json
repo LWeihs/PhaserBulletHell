@@ -1,6 +1,7 @@
 {
   "name": "Wizard Gasto",
   "id": "wizard_gasto",
+  "type": "boss",
   "routines": [
     {
       "name": "circle_test"

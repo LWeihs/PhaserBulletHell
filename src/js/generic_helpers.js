@@ -2,6 +2,8 @@ function getEntryModulo(arr, i) {
     return arr[i % arr.length];
 }
 
+/*---------------------------------------------------------------------------*/
+
 function makeArrayFromIntervals(start, end, interval) {
     const arr = [];
     let cur = start;
@@ -12,7 +14,16 @@ function makeArrayFromIntervals(start, end, interval) {
     return arr;
 }
 
+/*---------------------------------------------------------------------------*/
+
+function roundTo2Dp(num) {
+    return Math.round((num + 0.00001) * 100) / 100
+}
+
+/*---------------------------------------------------------------------------*/
+
 export {
     getEntryModulo,
     makeArrayFromIntervals,
+    roundTo2Dp,
 }

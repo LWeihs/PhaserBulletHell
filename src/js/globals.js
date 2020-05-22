@@ -35,6 +35,12 @@ const BOSS_OFFSETS = {
     x: 1/2,
     y: 1/10,
 };
+const BOSS_LIMITS = {
+    x_min: 0,
+    x_max: 1,
+    y_min: 0,
+    y_max: 1/3,
+};
 
 /** FOLDER STRUCTURE **/
 
@@ -55,6 +61,7 @@ export {
     KEY_BINDINGS,
     PLAYER_OFFSETS,
     BOSS_OFFSETS,
+    BOSS_LIMITS,
     ASSET_PATH,
     BACKGROUND_ALPHA,
     DEFAULT_SCROLL_SPEED,

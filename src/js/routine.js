@@ -117,15 +117,58 @@ export default class Routine {
         this.moves[time] = move;
     }
 
-
     /*---------------------------------------------------------------------------*/
 
     getMovesCurrentTime() {
-        const new_moves = this.moves[this.time];
-        if (new_moves) {
-            this.ongoing_movement = Object.assign(new_moves);
+        const new_move_info = this.moves[this.time];
+        if (new_move_info) {
+            switch (new_move_info.type) {
+                case 'Fixed':
+                    this.setOngoingMovement(new_move_info);
+                    break;
+                case 'Randomized':
+                    this.setOngoingMovementFromRandom(new_move_info);
+            }
         }
         return this.ongoing_movement;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    setOngoingMovementFromRandom(move_info) {
+        //determine x_velo and y_velo to be used at this time
+        const {x_velo_range, y_velo_range} = move_info;
+        move_info.x_velo = Phaser.Math.Between(x_velo_range[0], x_velo_range[1]);
+        move_info.y_velo = Phaser.Math.Between(y_velo_range[0], y_velo_range[1]);
+        //transfer info to tracked ongoing movement
+        this.setOngoingMovement(move_info);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    setOngoingMovement(move_info) {
+        //reduce given info to properties shown to outside
+        this.ongoing_movement = {
+            x_acceleration: move_info.x_acceleration,
+            y_acceleration: move_info.y_acceleration,
+            x_velo: move_info.x_velo,
+            y_velo: move_info.y_velo,
+            can_leave: move_info.can_leave,
+        };
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    disableOngoingXMovement() {
+        this.ongoing_movement.x_acceleration = 0;
+        this.ongoing_movement.x_velo = 0;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    disableOngoingYMovement() {
+        this.ongoing_movement.y_acceleration = 0;
+        this.ongoing_movement.y_velo = 0;
     }
 
     /*---------------------------------------------------------------------------*/

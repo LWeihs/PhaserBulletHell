@@ -40,6 +40,12 @@
         x: 1/2,
         y: 1/10,
     };
+    const BOSS_LIMITS = {
+        x_min: 0,
+        x_max: 1,
+        y_min: 0,
+        y_max: 1/3,
+    };
 
     /** FOLDER STRUCTURE **/
 
@@ -52,10 +58,59 @@
     const INVIS_FRAMES_AFTER_HIT = 60;
 
     class Enemy {
-        constructor(id) {
+        constructor(id, sprite, type, scene_width, scene_height) {
             this.id = id;
+            this.sprite = sprite;
             this.routines = [];
             this.cur_routine = 0;
+
+            this.setLimits(type, scene_width, scene_height);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        setLimits(type, scene_width, scene_height) {
+            //Object to write limits into
+            this.limits = {};
+
+            //find out factors to multiple scene width/height with to find out limits
+            let multipliers;
+            switch (type) {
+                case 'boss':
+                    multipliers = BOSS_LIMITS;
+                    break;
+                default:
+                    //default enemies do not have defined limits, can move anywhere
+                    multipliers = {
+                        x_min: undefined,
+                        x_max: undefined,
+                        y_min: undefined,
+                        y_max: undefined,
+                    };
+                    break;
+            }
+
+            //calculate limits based on scene width/height and multipliers
+            ['x_min', 'x_max'].forEach(x_limit => {
+                if (multipliers[x_limit] === undefined) {
+                    this.limits[x_limit] = undefined;
+                } else {
+                    this.limits[x_limit] = multipliers[x_limit] * scene_width;
+                }
+            });
+            ['y_min', 'y_max'].forEach(y_limit => {
+                if (multipliers[y_limit] === undefined) {
+                    this.limits[y_limit] = undefined;
+                } else {
+                    this.limits[y_limit] = multipliers[y_limit] * scene_height;
+                }
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getLimits() {
+            return this.limits;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -87,6 +142,18 @@
         getNextMoves() {
             //always returns an Object!
             return this.getCurrentRoutine().getMovesCurrentTime();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        disableOngoingXMovement() {
+            this.getCurrentRoutine().disableOngoingXMovement();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        disableOngoingYMovement() {
+            this.getCurrentRoutine().disableOngoingYMovement();
         }
 
         /*---------------------------------------------------------------------------*/
@@ -126,6 +193,8 @@
     function getEntryModulo(arr, i) {
         return arr[i % arr.length];
     }
+
+    /*---------------------------------------------------------------------------*/
 
     function makeArrayFromIntervals(start, end, interval) {
         const arr = [];
@@ -250,15 +319,58 @@
             this.moves[time] = move;
         }
 
-
         /*---------------------------------------------------------------------------*/
 
         getMovesCurrentTime() {
-            const new_moves = this.moves[this.time];
-            if (new_moves) {
-                this.ongoing_movement = Object.assign(new_moves);
+            const new_move_info = this.moves[this.time];
+            if (new_move_info) {
+                switch (new_move_info.type) {
+                    case 'Fixed':
+                        this.setOngoingMovement(new_move_info);
+                        break;
+                    case 'Randomized':
+                        this.setOngoingMovementFromRandom(new_move_info);
+                }
             }
             return this.ongoing_movement;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        setOngoingMovementFromRandom(move_info) {
+            //determine x_velo and y_velo to be used at this time
+            const {x_velo_range, y_velo_range} = move_info;
+            move_info.x_velo = Phaser.Math.Between(x_velo_range[0], x_velo_range[1]);
+            move_info.y_velo = Phaser.Math.Between(y_velo_range[0], y_velo_range[1]);
+            //transfer info to tracked ongoing movement
+            this.setOngoingMovement(move_info);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        setOngoingMovement(move_info) {
+            //reduce given info to properties shown to outside
+            this.ongoing_movement = {
+                x_acceleration: move_info.x_acceleration,
+                y_acceleration: move_info.y_acceleration,
+                x_velo: move_info.x_velo,
+                y_velo: move_info.y_velo,
+                can_leave: move_info.can_leave,
+            };
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        disableOngoingXMovement() {
+            this.ongoing_movement.x_acceleration = 0;
+            this.ongoing_movement.x_velo = 0;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        disableOngoingYMovement() {
+            this.ongoing_movement.y_acceleration = 0;
+            this.ongoing_movement.y_velo = 0;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -420,6 +532,84 @@
         return routine;
     }
 
+    function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        const dx = getSpriteDxPerFrame(sprite);
+        if (dx < 0) {
+            res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
+            if (dx < res.rem) {
+                res.possible = false;
+            }
+        } else if (dx > 0) {
+            res.rem = calcDistanceSpriteToLimitRight(sprite, x_max);
+            if (dx > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function checkSpriteYMovementPossible(sprite, {y_min, y_max}) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        const dy = getSpriteDyPerFrame(sprite);
+        if (dy < 0) {
+            res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
+            if (dy < res.rem) {
+                res.possible = false;
+            }
+        } else if (dy > 0) {
+            res.rem = calcDistanceSpriteToLimitDown(sprite, y_max);
+            if (dy > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitLeft(sprite, x_min) {
+        return sprite.x - sprite.body.halfWidth - x_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitRight(sprite, x_max) {
+        return x_max - (sprite.x + sprite.body.halfWidth);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitUp(sprite, y_min) {
+        return sprite.y - sprite.body.halfHeight - y_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitDown(sprite, y_max) {
+        return y_max - (sprite.y + sprite.body.halfHeight);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDxPerFrame(sprite) {
+        return sprite.body._dx;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDyPerFrame(sprite) {
+        return sprite.body._dy;
+    }
+
     //globals filled during execution
     let player;
     let player_bullets;
@@ -447,7 +637,6 @@
 
         init(global_data) {
             this.GLOBAL = global_data;
-            this.can_pause = true;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -661,30 +850,51 @@
             const ids_to_spawn = enemy_events[timer];
             if (!ids_to_spawn) return;
 
-            const {width: scene_width, height: scene_height} = this.scale;
-            enemy_events[timer].forEach(id => {
-                //create the enemy
-                const enemy = this.physics.add.image(scene_width * BOSS_OFFSETS.x,
-                    scene_height * BOSS_OFFSETS.y,
-                    id,
-                );
-                enemy.setDepth(1);
-                //track the created enemy
-                deadly_enemies.add(enemy);
-                enemies_by_id[id] = enemy;
-                this.addEnemyInfo(id);
+            enemy_events[timer].forEach(enemy_id => {
+                //create enemy sprite
+                const enemy_sprite = this.createEnemySprite(enemy_id);
+                //track the sprite
+                deadly_enemies.add(enemy_sprite);
+                enemies_by_id[enemy_id] = enemy_sprite;
+
+                //create information Object for the enemy
+                const enemy_info = this.createEnemyInfo(enemy_id, enemy_sprite);
+                //track the information
+                enemy_infos.push(enemy_info);
             });
         }
 
         /*---------------------------------------------------------------------------*/
 
-        addEnemyInfo(id) {
-            const enemy = new Enemy(id);
-            const enemy_info = this.cache.json.get(id);
-            enemy_info.routines.forEach(({name: routine_name}) => {
-                enemy.addRoutine(createRoutine(this.cache.json.get(routine_name)));
+        createEnemySprite(enemy_id) {
+            const {width: scene_width, height: scene_height} = this.scale;
+
+            //create sprite at position defined by offsets in globals
+            const enemy = this.physics.add.image(scene_width * BOSS_OFFSETS.x,
+                scene_height * BOSS_OFFSETS.y,
+                enemy_id,
+            );
+            enemy.setDepth(1);
+
+            return enemy;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        createEnemyInfo(enemy_id, enemy_sprite) {
+            const {width: scene_width, height: scene_height} = this.scale;
+
+            //get the enemies blueprint as noted in JSON file
+            const enemy_base = this.cache.json.get(enemy_id);
+            //create the Object to hold enemy information
+            const enemy_info = new Enemy(enemy_id, enemy_sprite, enemy_base.type,
+                scene_width, scene_height);
+            //add information on the used Routines
+            enemy_base.routines.forEach(({name: routine_name}) => {
+                enemy_info.addRoutine(createRoutine(this.cache.json.get(routine_name)));
             });
-            enemy_infos.push(enemy);
+
+            return enemy_info;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -694,8 +904,7 @@
                 const enemy = enemies_by_id[enemy_info.id];
 
                 //update enemy itself
-                const move_info = enemy_info.getNextMoves();
-                this.updateEnemyMovement(enemy, move_info);
+                this.updateEnemyMovement(enemy, enemy_info);
 
                 //handle enemy shooting as dictated by its routine
                 const shot_infos = enemy_info.getNextShots();
@@ -710,25 +919,31 @@
 
         /*---------------------------------------------------------------------------*/
 
-        updateEnemyMovement(enemy, move_info) {
-            const {x_acceleration, y_acceleration, can_leave} = move_info;
-            let x_velo, y_velo;
+        updateEnemyMovement(enemy, enemy_info) {
+            const move_info = enemy_info.getNextMoves();
+            let {x_acceleration, y_acceleration, x_velo, y_velo, can_leave} = move_info;
 
-            //calculate velocities if necessary
-            switch (move_info.type) {
-                case 'Randomized':
-                    const {x_velo_range, y_velo_range} = move_info;
-                    x_velo = Phaser.Math.Between(x_velo_range[0], x_velo_range[1]);
-                    y_velo = Phaser.Math.Between(y_velo_range[0], y_velo_range[1]);
-                    break;
-                case 'Fixed':
-                    x_velo = move_info.x_velo;
-                    y_velo = move_info.y_velo;
-                    break;
+            //ensure that random movements do stay within enemy's limits
+            if (!can_leave) {
+                const limits = enemy_info.getLimits();
+                //control x-movement
+                const {possible: x_move_possible, rem: x_rem} =
+                    checkSpriteXMovementPossible(enemy, limits);
+                if (!x_move_possible) {
+                    enemy_info.disableOngoingXMovement();
+                    enemy.x += x_rem;
+                    x_velo = 0;
+                }
+                //control y-movement
+                const {possible: y_move_possible, rem: y_rem} =
+                    checkSpriteYMovementPossible(enemy, limits);
+                if (!y_move_possible) {
+                    enemy_info.disableOngoingYMovement();
+                    enemy.y += y_rem;
+                    y_velo = 0;
+                }
             }
 
-            //make sure that enemy only leaves world when intended
-            enemy.setCollideWorldBounds(!can_leave);
             //set new movement
             enemy.setVelocityX(x_velo);
             enemy.setVelocityY(y_velo);
