@@ -181,9 +181,9 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     pauseGameIfRequested() {
-        const {PAUSE: pause_key_down} = this.GLOBAL.KEYS;
+        const {PAUSE: pause_key_active} = this.GLOBAL.KEY_TRACKER.active_keys;
 
-        if (pause_key_down) {
+        if (pause_key_active) {
             this.pauseGame();
         }
     }
@@ -191,7 +191,13 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     pauseGame() {
-        this.scene.launch(PAUSE_SCENE_KEY, this.GLOBAL);
+        if (!this.GLOBAL.PAUSE_SCENE_LAUNCHED) {
+            this.scene.launch(PAUSE_SCENE_KEY, this.GLOBAL);
+            this.GLOBAL.PAUSE_SCENE_LAUNCHED = true;
+        } else {
+            this.scene.wake(PAUSE_SCENE_KEY);
+        }
+        //halt update + render for main game
         this.scene.pause();
     }
 
@@ -204,31 +210,31 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     playerMove() {
-        //get information on which keys are pressed from shared globals
+        //get information on which keys are active from shared globals
         const {
-            UP: up_pressed,
-            DOWN: down_pressed,
-            LEFT: left_pressed,
-            RIGHT: right_pressed,
-            SLOW: slow_pressed,
-        } = this.GLOBAL.KEYS;
+            UP: up_active,
+            DOWN: down_active,
+            LEFT: left_active,
+            RIGHT: right_active,
+            SLOW: slow_active,
+        } = this.GLOBAL.KEY_TRACKER.active_keys;
 
         //determine player speed
         const {movement} = this.cache.json.get('player_info');
-        const speed = slow_pressed ? movement.slowed : movement.normal;
+        const speed = slow_active ? movement.slowed : movement.normal;
 
-        //set velocity based on speed and pressed movement keys
+        //set velocity based on speed and active movement keys
         let x_velo = 0, y_velo = 0;
-        if (up_pressed) {
+        if (up_active) {
             y_velo -= speed;
         }
-        if (down_pressed) {
+        if (down_active) {
             y_velo += speed;
         }
-        if (left_pressed) {
+        if (left_active) {
             x_velo -= speed;
         }
-        if (right_pressed) {
+        if (right_active) {
             x_velo += speed;
         }
         player.setVelocityX(x_velo);
@@ -238,9 +244,9 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     playerFire() {
-        const {FIRE: fire_btn_pressed} = this.GLOBAL.KEYS;
+        const {FIRE: fire_btn_active} = this.GLOBAL.KEY_TRACKER.active_keys;
         const {weapon} = this.cache.json.get('player_info');
-        if (fire_btn_pressed) {
+        if (fire_btn_active) {
             //if weapon is ready, create new player bullet
             if (recharge === 0) {
                 const bullet = player_bullets.create(player.x, player.y - player.height,

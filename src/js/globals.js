@@ -18,12 +18,19 @@ const KEY_BINDINGS = {
     FIRE: {type: 'keyboard', key: 'Y'},
     //general
     PAUSE: {type: 'keyboard', key: 'ESC'},
+    ENTER: {type: 'keyboard', key: 'ENTER'},
 };
 
 /** BACKGROUNDS **/
 
 const BACKGROUND_ALPHA = 0.5;
 const DEFAULT_SCROLL_SPEED = 2;
+
+/** PAUSE MENU **/
+
+const PAUSE_INPUT_DEBOUNCE_INITIAL_MS = 500;
+const PAUSE_INPUT_DEBOUNCE_QUICK_MS = 250;
+const PAUSE_OVERLAY_ALPHA = 0.94;
 
 /** POSITIONING **/
 
@@ -39,12 +46,13 @@ const BOSS_LIMITS = {
     x_min: 0,
     x_max: 1,
     y_min: 0,
-    y_max: 1/3,
+    y_max: 0.42,
 };
 
 /** FOLDER STRUCTURE **/
 
 const ASSET_PATH = 'assets';
+const MENU_ASSETS_FOLDER = 'menu';
 const PLAYER_JSON_PATH = 'player';
 const LEVEL_JSON_PATH = 'levels';
 
@@ -63,8 +71,12 @@ export {
     BOSS_OFFSETS,
     BOSS_LIMITS,
     ASSET_PATH,
+    MENU_ASSETS_FOLDER,
     BACKGROUND_ALPHA,
     DEFAULT_SCROLL_SPEED,
+    PAUSE_INPUT_DEBOUNCE_INITIAL_MS,
+    PAUSE_INPUT_DEBOUNCE_QUICK_MS,
+    PAUSE_OVERLAY_ALPHA,
     PLAYER_JSON_PATH,
     LEVEL_JSON_PATH,
     INVIS_FRAMES_AFTER_HIT,

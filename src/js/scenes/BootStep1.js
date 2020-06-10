@@ -4,8 +4,9 @@ import {
     KEY_TRACKER_KEY,
     PLAYER_JSON_PATH,
     KEY_BINDINGS,
-    LEVEL_JSON_PATH,
+    LEVEL_JSON_PATH, PAUSE_SCENE_KEY,
 } from "../globals";
+import KeyTracker from "../KeyTracker";
 
 export default class BootStep1 extends Phaser.Scene
 {
@@ -25,16 +26,10 @@ export default class BootStep1 extends Phaser.Scene
                 LEVEL_ID: "level_1",
                 //currently set key bindings
                 KEY_BINDINGS: KEY_BINDINGS,
-                //track which keys are currently hit
-                KEYS: {
-                    //player movement
-                    UP: false,
-                    DOWN: false,
-                    LEFT: false,
-                    RIGHT: false,
-                    //player slow down
-                    SLOW: false,
-                }
+                //tracking of keyboard interactions
+                KEY_TRACKER: new KeyTracker(),
+                //was game paused before
+                PAUSE_SCENE_LAUNCHED: false,
             };
         }
     }

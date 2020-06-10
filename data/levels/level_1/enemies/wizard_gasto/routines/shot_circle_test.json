@@ -10,8 +10,8 @@
       "times": [0, 180],
       "x_acceleration": 0,
       "y_acceleration": 0,
-      "x_velo_range": [-30, 30],
-      "y_velo_range": [-30, 30]
+      "x_velo_range": [-60, 60],
+      "y_velo_range": [-60, 60]
     }
   ],
 

@@ -2,7 +2,7 @@ import FightScene from "./scenes/FightScene";
 import BootStep1 from "./scenes/BootStep1";
 import BootStep2 from "./scenes/BootStep2";
 import PauseScene from "./scenes/PauseScene";
-import KeyTracker from "./scenes/KeyTracker";
+import BackgroundKeyTracking from "./scenes/BackgroundKeyTracking";
 
 const config = {
     type: Phaser.AUTO,
@@ -21,7 +21,7 @@ const config = {
     scene: [
         BootStep1, //load json files of level
         BootStep2, //load referenced files from BootStep1
-        KeyTracker, //to track keyboard input over multiple scenes
+        BackgroundKeyTracking, //to track keyboard input over multiple scenes
         FightScene, //main game scene
         PauseScene, //pause menu
     ],
