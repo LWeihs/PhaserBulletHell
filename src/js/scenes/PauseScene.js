@@ -6,7 +6,10 @@ import {
     PAUSE_INPUT_DEBOUNCE_INITIAL_MS,
     PAUSE_INPUT_DEBOUNCE_QUICK_MS,
     PAUSE_OVERLAY_ALPHA,
+    PAUSE_MENU_UPPER_LEFT,
+    PAUSE_MENU_Y_OFFSET,
 } from "../globals";
+import {getPositionFromPercentages} from "../SpriteHelpers";
 
 const image_names = {
     continue: {
@@ -16,6 +19,10 @@ const image_names = {
     restart: {
         selected: 'restart_selected',
         unselected: 'restart_unselected',
+    },
+    exit: {
+        selected: 'exit_selected',
+        unselected: 'exit_unselected',
     },
 };
 
@@ -35,12 +42,22 @@ export default class PauseScene extends Phaser.Scene {
         this.menu_items = [
             'continue',
             'restart',
-            //'exit',
+            'exit',
         ];
         this.menu_images = {};
         this.current_idx = 0;
+
         //events to execute on timer, by key that initiated them
         this.time_events = {};
+
+        //control over placement of menu items
+        this.next_item_position =
+            getPositionFromPercentages(PAUSE_MENU_UPPER_LEFT, this.scale);
+        this.item_y_offset = PAUSE_MENU_Y_OFFSET * this.scale.height;
+
+        //initial blocks for specific keys
+        this.can_accept_fire_key = false;
+        this.can_accept_enter_key = false;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -89,17 +106,31 @@ export default class PauseScene extends Phaser.Scene {
 
         //create items user can choose from to proceed
         for (const item_name in image_names) {
-            this.createMenuItem(item_name);
+            //create next item using logged this.next_item_position
+            const item = this.createMenuItem(item_name);
+            //update placement for item after just added item
+            this.moveNextItemPosition(item);
         }
 
-        //show correct menu item as highlighted after menu creation
-        this.showCorrectSelection();
+        //set state of scene to its default state
+        this.setSceneToFreshState();
 
         //behavior when the scene exits sleep mode
         this.events.on('wake', () => {
-            this.current_idx = 0;
-            this.showCorrectSelection();
+            this.setSceneToFreshState();
         })
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    setSceneToFreshState() {
+        //reset menu index
+        this.current_idx = 0;
+        //show correct menu item as highlighted after menu creation
+        this.showCorrectSelection();
+        //block menu interaction to avoid immediate exit
+        this.can_accept_fire_key = false;
+        this.can_accept_enter_key = false;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -117,14 +148,24 @@ export default class PauseScene extends Phaser.Scene {
     createMenuItem(item_name) {
         const {selected: sel_image_name, unselected: unsel_image_name} =
             image_names[item_name];
+        //get next position for images
+        const {x: item_x, y: item_y} = this.next_item_position;
         //create the images
-        const sel_image = this.add.image(200, 200, sel_image_name);
-        const unsel_image = this.add.image(200, 200, unsel_image_name);
+        const sel_image = this.add.image(item_x, item_y, sel_image_name).setOrigin(0);
+        const unsel_image = this.add.image(item_x, item_y, unsel_image_name).setOrigin(0);
         //log the images by item name
         this.menu_images[item_name] = {
             selected: sel_image,
             unselected: unsel_image,
         };
+        //drawn images are same size, so return any
+        return sel_image;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    moveNextItemPosition(last_added_item) {
+        this.next_item_position.y += this.item_y_offset + last_added_item.height;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -141,13 +182,10 @@ export default class PauseScene extends Phaser.Scene {
             return;
         }
 
-        //when user selects option, determine how to proceed
-        const {
-            FIRE: fire_key_active,
-            ENTER: enter_key_active,
-        } = key_tracker.active_keys;
-        if (fire_key_active || enter_key_active) {
-            this.handleCurrentMenuItem();
+        //initially, proceed keys are not accepted - check if this should change
+        this.changeProceedKeysAcceptance();
+        //determine how scene should proceed when menu items get selected
+        if (this.handleMenuItemSelection()) {
             return;
         }
 
@@ -155,6 +193,42 @@ export default class PauseScene extends Phaser.Scene {
         this.updateMenuInformation();
         //update shown selection after update of data structure
         this.showCorrectSelection();
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    changeProceedKeysAcceptance() {
+        const key_tracker = this.GLOBAL.KEY_TRACKER;
+        const {
+            FIRE: fire_key_pressed,
+            ENTER: enter_key_pressed,
+        } = key_tracker.pressed_keys;
+        if (!fire_key_pressed) {
+            this.can_accept_fire_key = true;
+        }
+        if (!enter_key_pressed) {
+            this.can_accept_enter_key = true;
+        }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    handleMenuItemSelection() {
+        const {
+            FIRE: fire_key_active,
+            ENTER: enter_key_active,
+        } = this.GLOBAL.KEY_TRACKER.active_keys;
+
+        //infer acceptance criteria
+        const fire_key_accepted = fire_key_active && this.can_accept_fire_key;
+        const enter_key_accepted = enter_key_active && this.can_accept_enter_key;
+
+        //proceed if any acceptance criterion is satisfied
+        if (fire_key_accepted || enter_key_accepted) {
+            this.handleCurrentMenuItem();
+            return true;
+        }
+        return false;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -184,10 +258,10 @@ export default class PauseScene extends Phaser.Scene {
         let index_update_fn;
         switch (key) {
             case 'UP':
-                index_update_fn = this.incrementMenuIndex.bind(this);
+                index_update_fn = this.decrementMenuIndex.bind(this);
                 break;
             case 'DOWN':
-                index_update_fn = this.decrementMenuIndex.bind(this);
+                index_update_fn = this.incrementMenuIndex.bind(this);
                 break;
         }
         //get necessary key information

@@ -78,7 +78,18 @@ function getSpriteDyPerFrame(sprite) {
 
 /*---------------------------------------------------------------------------*/
 
+function getPositionFromPercentages({x: percentage_x, y: percentage_y},
+                                    {width: scene_width, height: scene_height}) {
+    return {
+        x: percentage_x * scene_width,
+        y: percentage_y * scene_height,
+    };
+}
+
+/*---------------------------------------------------------------------------*/
+
 export {
     checkSpriteXMovementPossible,
     checkSpriteYMovementPossible,
+    getPositionFromPercentages,
 }

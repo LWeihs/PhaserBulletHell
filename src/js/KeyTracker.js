@@ -4,6 +4,8 @@ const key_base = {
     DOWN: false,
     LEFT: false,
     RIGHT: false,
+    //player fire bullets/accept prompts
+    FIRE: false,
     //player slow down
     SLOW: false,
     //player input to pause/unpause game

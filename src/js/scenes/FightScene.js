@@ -15,6 +15,7 @@ import {
 import {
     checkSpriteXMovementPossible,
     checkSpriteYMovementPossible,
+    getPositionFromPercentages,
 } from "../SpriteHelpers";
 
 //globals filled during execution
@@ -103,8 +104,7 @@ export default class FightScene extends Phaser.Scene {
 
     create () {
         //background
-        const {width: scene_width, height: scene_height} = this.scale;
-        this.setUpBackground(scene_width, scene_height);
+        this.setUpBackground();
 
         //groups for enemies and bullets
         player_bullets = this.physics.add.group();
@@ -112,12 +112,7 @@ export default class FightScene extends Phaser.Scene {
         deadly_enemies = this.physics.add.group();
 
         //player setup
-        player = this.physics.add.image(scene_width * PLAYER_OFFSETS.x,
-            scene_height * PLAYER_OFFSETS.y,
-            'player_sprite'
-        );
-        player.setCollideWorldBounds(true);
-        player.setDepth(1);
+        player = this.createPlayerSprite();
 
         //setup collision detection of the distinct physics groups
         this.physics.add.overlap(player, deadly_enemies, this.handlePlayerHit, null, this);
@@ -126,7 +121,8 @@ export default class FightScene extends Phaser.Scene {
 
     /*---------------------------------------------------------------------------*/
 
-    setUpBackground(scene_width, scene_height) {
+    setUpBackground() {
+        const {height: scene_height} = this.scale;
         const bg = this.textures.get('background_shapes');
         const {width: bg_width} = bg.frames.__BASE;
         this.firstParallax = this.add.tileSprite(bg_width / 2,
@@ -136,6 +132,17 @@ export default class FightScene extends Phaser.Scene {
             'background_shapes'
         );
         this.firstParallax.setAlpha(BACKGROUND_ALPHA);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    createPlayerSprite() {
+        const {x: player_x, y: player_y} =
+            getPositionFromPercentages(PLAYER_OFFSETS, this.scale);
+        const player = this.physics.add.image(player_x, player_y, 'player_sprite');
+        player.setCollideWorldBounds(true);
+        player.setDepth(1);
+        return player;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -282,15 +289,10 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     createEnemySprite(enemy_id) {
-        const {width: scene_width, height: scene_height} = this.scale;
-
         //create sprite at position defined by offsets in globals
-        const enemy = this.physics.add.image(scene_width * BOSS_OFFSETS.x,
-            scene_height * BOSS_OFFSETS.y,
-            enemy_id,
-        );
+        const {x: enemy_x, y: enemy_y} = getPositionFromPercentages(BOSS_OFFSETS, this.scale);
+        const enemy = this.physics.add.image(enemy_x, enemy_y, enemy_id);
         enemy.setDepth(1);
-
         return enemy;
     }
 

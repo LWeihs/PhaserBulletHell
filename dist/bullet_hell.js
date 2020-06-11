@@ -36,6 +36,11 @@
     const PAUSE_INPUT_DEBOUNCE_INITIAL_MS = 500;
     const PAUSE_INPUT_DEBOUNCE_QUICK_MS = 250;
     const PAUSE_OVERLAY_ALPHA = 0.94;
+    const PAUSE_MENU_UPPER_LEFT = {
+        x: 1/20,
+        y: 6/10,
+    };
+    const PAUSE_MENU_Y_OFFSET = 1/100;
 
     /** POSITIONING **/
 
@@ -618,6 +623,16 @@
         return sprite.body._dy;
     }
 
+    /*---------------------------------------------------------------------------*/
+
+    function getPositionFromPercentages({x: percentage_x, y: percentage_y},
+                                        {width: scene_width, height: scene_height}) {
+        return {
+            x: percentage_x * scene_width,
+            y: percentage_y * scene_height,
+        };
+    }
+
     //globals filled during execution
     let player;
     let player_bullets;
@@ -702,8 +717,7 @@
 
         create () {
             //background
-            const {width: scene_width, height: scene_height} = this.scale;
-            this.setUpBackground(scene_width, scene_height);
+            this.setUpBackground();
 
             //groups for enemies and bullets
             player_bullets = this.physics.add.group();
@@ -711,12 +725,7 @@
             deadly_enemies = this.physics.add.group();
 
             //player setup
-            player = this.physics.add.image(scene_width * PLAYER_OFFSETS.x,
-                scene_height * PLAYER_OFFSETS.y,
-                'player_sprite'
-            );
-            player.setCollideWorldBounds(true);
-            player.setDepth(1);
+            player = this.createPlayerSprite();
 
             //setup collision detection of the distinct physics groups
             this.physics.add.overlap(player, deadly_enemies, this.handlePlayerHit, null, this);
@@ -725,7 +734,8 @@
 
         /*---------------------------------------------------------------------------*/
 
-        setUpBackground(scene_width, scene_height) {
+        setUpBackground() {
+            const {height: scene_height} = this.scale;
             const bg = this.textures.get('background_shapes');
             const {width: bg_width} = bg.frames.__BASE;
             this.firstParallax = this.add.tileSprite(bg_width / 2,
@@ -735,6 +745,17 @@
                 'background_shapes'
             );
             this.firstParallax.setAlpha(BACKGROUND_ALPHA);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        createPlayerSprite() {
+            const {x: player_x, y: player_y} =
+                getPositionFromPercentages(PLAYER_OFFSETS, this.scale);
+            const player = this.physics.add.image(player_x, player_y, 'player_sprite');
+            player.setCollideWorldBounds(true);
+            player.setDepth(1);
+            return player;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -881,15 +902,10 @@
         /*---------------------------------------------------------------------------*/
 
         createEnemySprite(enemy_id) {
-            const {width: scene_width, height: scene_height} = this.scale;
-
             //create sprite at position defined by offsets in globals
-            const enemy = this.physics.add.image(scene_width * BOSS_OFFSETS.x,
-                scene_height * BOSS_OFFSETS.y,
-                enemy_id,
-            );
+            const {x: enemy_x, y: enemy_y} = getPositionFromPercentages(BOSS_OFFSETS, this.scale);
+            const enemy = this.physics.add.image(enemy_x, enemy_y, enemy_id);
             enemy.setDepth(1);
-
             return enemy;
         }
 
@@ -1027,6 +1043,8 @@
         DOWN: false,
         LEFT: false,
         RIGHT: false,
+        //player fire bullets/accept prompts
+        FIRE: false,
         //player slow down
         SLOW: false,
         //player input to pause/unpause game
@@ -1218,6 +1236,10 @@
             selected: 'restart_selected',
             unselected: 'restart_unselected',
         },
+        exit: {
+            selected: 'exit_selected',
+            unselected: 'exit_unselected',
+        },
     };
 
 
@@ -1236,12 +1258,22 @@
             this.menu_items = [
                 'continue',
                 'restart',
-                //'exit',
+                'exit',
             ];
             this.menu_images = {};
             this.current_idx = 0;
+
             //events to execute on timer, by key that initiated them
             this.time_events = {};
+
+            //control over placement of menu items
+            this.next_item_position =
+                getPositionFromPercentages(PAUSE_MENU_UPPER_LEFT, this.scale);
+            this.item_y_offset = PAUSE_MENU_Y_OFFSET * this.scale.height;
+
+            //initial blocks for specific keys
+            this.can_accept_fire_key = false;
+            this.can_accept_enter_key = false;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1290,17 +1322,31 @@
 
             //create items user can choose from to proceed
             for (const item_name in image_names) {
-                this.createMenuItem(item_name);
+                //create next item using logged this.next_item_position
+                const item = this.createMenuItem(item_name);
+                //update placement for item after just added item
+                this.moveNextItemPosition(item);
             }
 
-            //show correct menu item as highlighted after menu creation
-            this.showCorrectSelection();
+            //set state of scene to its default state
+            this.setSceneToFreshState();
 
             //behavior when the scene exits sleep mode
             this.events.on('wake', () => {
-                this.current_idx = 0;
-                this.showCorrectSelection();
+                this.setSceneToFreshState();
             });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        setSceneToFreshState() {
+            //reset menu index
+            this.current_idx = 0;
+            //show correct menu item as highlighted after menu creation
+            this.showCorrectSelection();
+            //block menu interaction to avoid immediate exit
+            this.can_accept_fire_key = false;
+            this.can_accept_enter_key = false;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1318,14 +1364,24 @@
         createMenuItem(item_name) {
             const {selected: sel_image_name, unselected: unsel_image_name} =
                 image_names[item_name];
+            //get next position for images
+            const {x: item_x, y: item_y} = this.next_item_position;
             //create the images
-            const sel_image = this.add.image(200, 200, sel_image_name);
-            const unsel_image = this.add.image(200, 200, unsel_image_name);
+            const sel_image = this.add.image(item_x, item_y, sel_image_name).setOrigin(0);
+            const unsel_image = this.add.image(item_x, item_y, unsel_image_name).setOrigin(0);
             //log the images by item name
             this.menu_images[item_name] = {
                 selected: sel_image,
                 unselected: unsel_image,
             };
+            //drawn images are same size, so return any
+            return sel_image;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        moveNextItemPosition(last_added_item) {
+            this.next_item_position.y += this.item_y_offset + last_added_item.height;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1342,13 +1398,10 @@
                 return;
             }
 
-            //when user selects option, determine how to proceed
-            const {
-                FIRE: fire_key_active,
-                ENTER: enter_key_active,
-            } = key_tracker.active_keys;
-            if (fire_key_active || enter_key_active) {
-                this.handleCurrentMenuItem();
+            //initially, proceed keys are not accepted - check if this should change
+            this.changeProceedKeysAcceptance();
+            //determine how scene should proceed when menu items get selected
+            if (this.handleMenuItemSelection()) {
                 return;
             }
 
@@ -1356,6 +1409,42 @@
             this.updateMenuInformation();
             //update shown selection after update of data structure
             this.showCorrectSelection();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        changeProceedKeysAcceptance() {
+            const key_tracker = this.GLOBAL.KEY_TRACKER;
+            const {
+                FIRE: fire_key_pressed,
+                ENTER: enter_key_pressed,
+            } = key_tracker.pressed_keys;
+            if (!fire_key_pressed) {
+                this.can_accept_fire_key = true;
+            }
+            if (!enter_key_pressed) {
+                this.can_accept_enter_key = true;
+            }
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        handleMenuItemSelection() {
+            const {
+                FIRE: fire_key_active,
+                ENTER: enter_key_active,
+            } = this.GLOBAL.KEY_TRACKER.active_keys;
+
+            //infer acceptance criteria
+            const fire_key_accepted = fire_key_active && this.can_accept_fire_key;
+            const enter_key_accepted = enter_key_active && this.can_accept_enter_key;
+
+            //proceed if any acceptance criterion is satisfied
+            if (fire_key_accepted || enter_key_accepted) {
+                this.handleCurrentMenuItem();
+                return true;
+            }
+            return false;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1383,10 +1472,10 @@
             let index_update_fn;
             switch (key) {
                 case 'UP':
-                    index_update_fn = this.incrementMenuIndex.bind(this);
+                    index_update_fn = this.decrementMenuIndex.bind(this);
                     break;
                 case 'DOWN':
-                    index_update_fn = this.decrementMenuIndex.bind(this);
+                    index_update_fn = this.incrementMenuIndex.bind(this);
                     break;
             }
             //get necessary key information
