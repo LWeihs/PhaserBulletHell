@@ -320,6 +320,15 @@ export default class FightScene extends Phaser.Scene {
         enemy_infos.forEach(enemy_info => {
             const enemy = enemies_by_id[enemy_info.id];
 
+            //handle routine transitions
+            if (enemy_info.isCurrentRoutineFinished()) {
+                if (enemy_info.existNextRoutine()) {
+                    enemy_info.advanceRoutine();
+                } else {
+                    //TODO: enemy is done here
+                }
+            }
+
             //update enemy itself
             this.updateEnemyMovement(enemy, enemy_info);
 

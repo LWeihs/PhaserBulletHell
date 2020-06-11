@@ -64,6 +64,12 @@ export default class Enemy {
 
     /*---------------------------------------------------------------------------*/
 
+    isCurrentRoutineFinished() {
+        return this.getCurrentRoutine().isFinished();
+    }
+
+    /*---------------------------------------------------------------------------*/
+
     existNextRoutine() {
         return this.cur_routine < this.routines.length-1;
     }

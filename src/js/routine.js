@@ -184,6 +184,9 @@ export default class Routine {
             case 'ShotCircle':
                 this.addShotsFromShotCircle(shot_desc);
                 break;
+            case 'ShotTwister':
+                this.addShotsFromShotTwister(shot_desc);
+                break;
         }
     }
 
@@ -286,9 +289,84 @@ export default class Routine {
                 x_offset: x_offset + x_offset_circle,
                 y_offset: y_offset + y_offset_circle,
             };
+            //add shot at expected times
             times.forEach(time => {
                 this.addSingleShot(shot, time, anchor);
             });
+        }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    addShotsFromShotTwister(shot_twister_desc) {
+        let {
+            anchor,
+            x_offset,
+            y_offset,
+            speeds,
+            start_degree,
+            finish_degree,
+            direction,
+            degree_offset,
+            shot_ids,
+            start_time,
+            time_interval,
+            radius,
+            continuous,
+            repeat_interval
+        } = shot_twister_desc;
+
+        //infer number of shots to create
+        const degree_diff = finish_degree - start_degree;
+        const nr_shots = Math.floor(degree_diff/degree_offset);
+        if (nr_shots <= 0) {
+            return;
+        }
+
+        //infer full time of twister (until all shots are dealt with)
+        const full_time = (nr_shots-1) * time_interval;
+
+        //infer direction multiplier
+        const dir_multiplier = (direction === 'clockwise') ? 1 : -1;
+
+        //set degree and time of first twister shot
+        let cur_degree = start_degree;
+        let cur_time = start_time;
+
+        //create individual shots
+        for (let i=0; i<nr_shots; ++i) {
+            //determine where shot spawns
+            const {x: x_offset_circle, y: y_offset_circle} =
+                divideDistXAndY(radius, cur_degree, false);
+            //build the shot
+            const shot = {
+                shot_id: getEntryModulo(shot_ids, i),
+                speed: getEntryModulo(speeds, i),
+                degree: cur_degree,
+                x_offset: x_offset + x_offset_circle,
+                y_offset: y_offset + y_offset_circle,
+            };
+            //find times when shot should be created
+            let times = [];
+            if (continuous) {
+                let next_time = cur_time;
+                while (next_time < this.duration) {
+                    times.push(next_time);
+                    next_time += (full_time + repeat_interval);
+                }
+            } else {
+                times.push(cur_time);
+            }
+
+            //add shots at expected times
+            times.forEach(time =>  {
+                this.addSingleShot(shot, time, anchor);
+            });
+
+
+            //update next position and next shot spawn time
+            cur_degree += dir_multiplier * degree_offset;
+            cur_time += time_interval;
         }
     }
 
