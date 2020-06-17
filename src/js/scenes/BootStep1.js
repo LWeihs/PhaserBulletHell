@@ -4,8 +4,8 @@ import {
     KEY_TRACKER_KEY,
     PLAYER_JSON_PATH,
     KEY_BINDINGS,
-    LEVEL_JSON_PATH, PAUSE_SCENE_KEY,
-} from "../globals";
+    LEVEL_JSON_PATH,
+} from "../Globals";
 import KeyTracker from "../KeyTracker";
 
 export default class BootStep1 extends Phaser.Scene

@@ -1,6 +1,6 @@
 import {
     KEY_TRACKER_KEY
-} from "../globals";
+} from "../Globals";
 
 export default class BackgroundKeyTracking extends Phaser.Scene {
     constructor() {

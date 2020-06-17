@@ -99,9 +99,9 @@ export default class KeyTracker {
     /**
      * @returns {Phaser.Timer} - the timer that was started within the debounce
      */
-    debounceKey(key, delay, scene) {
+    debounceKey(key, delay, game) {
         this.setKeyBlocked(key);
-        return scene.time.addEvent({
+        return game.time.addEvent({
             delay: delay,
             callback: () => {
                 this.setKeyUnblocked(key);

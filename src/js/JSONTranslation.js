@@ -1,4 +1,4 @@
-import Routine from "./routine";
+import Routine from "./Routine";
 
 function createRoutine(info) {
     const routine = new Routine(info);

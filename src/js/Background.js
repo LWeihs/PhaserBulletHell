@@ -1,5 +1,5 @@
+import {BACKGROUND_ALPHA} from "./Globals";
 import {makeAssetPath} from "./ProjectHelpers";
-import {BACKGROUND_ALPHA} from "./globals";
 
 /**
  * Based on level info JSON.

@@ -8,7 +8,7 @@ import {
     PAUSE_OVERLAY_ALPHA,
     PAUSE_MENU_UPPER_LEFT,
     PAUSE_MENU_Y_OFFSET,
-} from "../globals";
+} from "../Globals";
 import {getPositionFromPercentages} from "../SpriteHelpers";
 
 const image_names = {

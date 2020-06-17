@@ -1,16 +1,16 @@
-import {divideDistXAndY} from "./geometry_helpers";
+import {divideDistXAndY} from "./GeometryHelpers";
 
-function createMultipleShotSprites(game, shot_infos, reference) {
+function createMultipleShotSprites(game, shot_infos, reference, shot_group) {
     const shot_sprites = [];
     shot_infos.forEach(shot_info => {
-        shot_sprites.push(createShotSprite(game, shot_info, reference));
+        shot_sprites.push(createShotSprite(game, shot_info, reference, shot_group));
     });
     return shot_sprites;
 }
 
 /*---------------------------------------------------------------------------*/
 
-function createShotSprite(game, shot_info, reference) {
+function createShotSprite(game, shot_info, reference, shot_group) {
     let {
         shot_id, //ID of the shot image (in game's cache)
         x_offset, //x-offset from reference
@@ -55,19 +55,21 @@ function createShotSprite(game, shot_info, reference) {
             break;
     }
 
-    //create the shot as physical image in the game world at placement
+    //create the shot as physics image in the game world at placement
     const shot = game.physics.add.image(shot_x, shot_y, shot_id);
 
+    //add shot to given physics group BEFORE setting velocity
+    if (shot_group) {
+        shot_group.add(shot);
+    }
+
     //find values to use for x- and y-velocity of shot
-    if (!x_velo) {
+    if (x_velo === undefined) {
         //ALTERNATIVE 2
         ({x: x_velo, y: y_velo} = divideDistXAndY(speed, degree, false));
     }
     shot.setVelocityX(x_velo);
     shot.setVelocityY(y_velo);
-
-    //return the created physics object
-    return shot;
 }
 
 /*---------------------------------------------------------------------------*/

@@ -65,10 +65,6 @@
     const PLAYER_JSON_PATH = 'player';
     const LEVEL_JSON_PATH = 'levels';
 
-    /** PLAYER INFORMATION (SAME BETWEEN ALL PLAYERS) **/
-
-    const INVIS_FRAMES_AFTER_HIT = 60;
-
     function divideDistXAndY(dist, angle, isRadian = true) {
         angle = isRadian ? angle : degreeToRadian(angle);
         return {
@@ -81,6 +77,75 @@
 
     function degreeToRadian(degree) {
         return degree * Math.PI/180;
+    }
+
+    function createMultipleShotSprites(game, shot_infos, reference, shot_group) {
+        const shot_sprites = [];
+        shot_infos.forEach(shot_info => {
+            shot_sprites.push(createShotSprite(game, shot_info, reference, shot_group));
+        });
+        return shot_sprites;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function createShotSprite(game, shot_info, reference, shot_group) {
+        let {
+            shot_id, //ID of the shot image (in game's cache)
+            x_offset, //x-offset from reference
+            y_offset, //y-offset from reference
+            anchor, //side (or middle) of reference to anchor shot to
+
+            //-- multiple alternatives to express shot's velocity --
+
+            //ALTERNATIVE 1
+            x_velo, //the shot's velocity in x-direction
+            y_velo, //the shot's velocity in y-direction
+
+            //ALTERNATIVE 2
+            degree, //degree (from start point) to angle shot at
+            speed, //speed to divide into x- and y-velocity
+        } = shot_info;
+        const {
+            x: ref_x,
+            y: ref_y,
+            width: ref_width,
+            height: ref_height,
+        } = reference;
+
+        //find placement of shot based on given information
+        let shot_x = ref_x + x_offset;
+        let shot_y = ref_y + y_offset;
+        switch(anchor) {
+            case 'Top':
+                shot_y -= ref_height/2;
+                break;
+            case 'Bottom':
+                shot_y += ref_height/2;
+                break;
+            case 'Left':
+                shot_x -= ref_width/2;
+                break;
+            case 'Right':
+                shot_x += ref_width/2;
+                break;
+        }
+
+        //create the shot as physics image in the game world at placement
+        const shot = game.physics.add.image(shot_x, shot_y, shot_id);
+
+        //add shot to given physics group BEFORE setting velocity
+        if (shot_group) {
+            shot_group.add(shot);
+        }
+
+        //find values to use for x- and y-velocity of shot
+        if (x_velo === undefined) {
+            //ALTERNATIVE 2
+            ({x: x_velo, y: y_velo} = divideDistXAndY(speed, degree, false));
+        }
+        shot.setVelocityX(x_velo);
+        shot.setVelocityY(y_velo);
     }
 
     function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
@@ -171,73 +236,6 @@
         };
     }
 
-    function createMultipleShotSprites(game, shot_infos, reference) {
-        const shot_sprites = [];
-        shot_infos.forEach(shot_info => {
-            shot_sprites.push(createShotSprite(game, shot_info, reference));
-        });
-        return shot_sprites;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function createShotSprite(game, shot_info, reference) {
-        let {
-            shot_id, //ID of the shot image (in game's cache)
-            x_offset, //x-offset from reference
-            y_offset, //y-offset from reference
-            anchor, //side (or middle) of reference to anchor shot to
-
-            //-- multiple alternatives to express shot's velocity --
-
-            //ALTERNATIVE 1
-            x_velo, //the shot's velocity in x-direction
-            y_velo, //the shot's velocity in y-direction
-
-            //ALTERNATIVE 2
-            degree, //degree (from start point) to angle shot at
-            speed, //speed to divide into x- and y-velocity
-        } = shot_info;
-        const {
-            x: ref_x,
-            y: ref_y,
-            width: ref_width,
-            height: ref_height,
-        } = reference;
-
-        //find placement of shot based on given information
-        let shot_x = ref_x + x_offset;
-        let shot_y = ref_y + y_offset;
-        switch(anchor) {
-            case 'Top':
-                shot_y -= ref_height/2;
-                break;
-            case 'Bottom':
-                shot_y += ref_height/2;
-                break;
-            case 'Left':
-                shot_x -= ref_width/2;
-                break;
-            case 'Right':
-                shot_x += ref_width/2;
-                break;
-        }
-
-        //create the shot as physical image in the game world at placement
-        const shot = game.physics.add.image(shot_x, shot_y, shot_id);
-
-        //find values to use for x- and y-velocity of shot
-        if (!x_velo) {
-            //ALTERNATIVE 2
-            ({x: x_velo, y: y_velo} = divideDistXAndY(speed, degree, false));
-        }
-        shot.setVelocityX(x_velo);
-        shot.setVelocityY(y_velo);
-
-        //return the created physics object
-        return shot;
-    }
-
     class Player {
         constructor({asset_folder, weapon, movement, invincibility_window, lives}) {
             //inferred properties
@@ -250,11 +248,17 @@
             this.movement = movement; //normal, slowed
             this.invis_frames = {
                 max: invincibility_window,
-                remaining: 0,
+                active: false,
             };
             this.cur_lives = lives;
             //properties to fill
             this.sprite = null;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        isInvincible() {
+            return this.invis_frames.active;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -271,13 +275,9 @@
 
         /*---------------------------------------------------------------------------*/
 
-        update(game, active_keys) {
+        update(game, active_keys, shot_group) {
             this._updateMovement(active_keys);
-            const created_shots = this._createShots(game, active_keys);
-            //return info on created physics entities during update step
-            return {
-                shots: created_shots,
-            }
+            this._createShots(game, active_keys, shot_group);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -314,74 +314,42 @@
 
         /*---------------------------------------------------------------------------*/
 
-        _createShots(game, active_keys) {
+        _createShots(game, active_keys, shot_group) {
             const {FIRE: fire_btn_active} = active_keys;
             if (fire_btn_active) {
                 if (this.weapon.cooldown <= 0) {
                     this.weapon.cooldown = this.weapon.fire_rate;
-                    return createMultipleShotSprites(game, this.weapon.shots, this.sprite);
+                    createMultipleShotSprites(game, this.weapon.shots, this.sprite,
+                        shot_group);
                 } else {
                     this.weapon.cooldown--;
                 }
             }
-            return [];
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        addToLives(addend) {
+            this.cur_lives += addend;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        triggerInvincibility(game) {
+            this.invis_frames.active = true;
+            game.time.addEvent({
+                delay: this.invis_frames.max,
+                callback: () => {
+                    this.invis_frames.active = false;
+                },
+            });
         }
     }
 
-    class Enemy {
-        constructor(id, sprite, type, scene_width, scene_height) {
-            this.id = id;
-            this.sprite = sprite;
+    class EnemyEventTracker {
+        constructor() {
             this.routines = [];
             this.cur_routine = 0;
-
-            this.setLimits(type, scene_width, scene_height);
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        setLimits(type, scene_width, scene_height) {
-            //Object to write limits into
-            this.limits = {};
-
-            //find out factors to multiple scene width/height with to find out limits
-            let multipliers;
-            switch (type) {
-                case 'boss':
-                    multipliers = BOSS_LIMITS;
-                    break;
-                default:
-                    //default enemies do not have defined limits, can move anywhere
-                    multipliers = {
-                        x_min: undefined,
-                        x_max: undefined,
-                        y_min: undefined,
-                        y_max: undefined,
-                    };
-                    break;
-            }
-
-            //calculate limits based on scene width/height and multipliers
-            ['x_min', 'x_max'].forEach(x_limit => {
-                if (multipliers[x_limit] === undefined) {
-                    this.limits[x_limit] = undefined;
-                } else {
-                    this.limits[x_limit] = multipliers[x_limit] * scene_width;
-                }
-            });
-            ['y_min', 'y_max'].forEach(y_limit => {
-                if (multipliers[y_limit] === undefined) {
-                    this.limits[y_limit] = undefined;
-                } else {
-                    this.limits[y_limit] = multipliers[y_limit] * scene_height;
-                }
-            });
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        getLimits() {
-            return this.limits;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -450,71 +418,6 @@
 
         updateCurrentRoutine() {
             this.getCurrentRoutine().advanceTimer();
-        }
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function makeAssetPath(suffix) {
-        return `${ASSET_PATH}/${suffix}`;
-    }
-
-    /**
-     * Based on level info JSON.
-     */
-    class Background {
-        constructor(bg_info) {
-            this.asset_folder = bg_info.folder;
-            this.parallaxes = bg_info.parallaxes;
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        preload(game, asset_map) {
-            this.parallaxes.forEach(({background_id: img_id}) => {
-                const img_path = makeAssetPath(`${this.asset_folder}/${asset_map[img_id]}`);
-                game.load.image(img_id, img_path);
-            });
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        create(game) {
-            this.parallaxes.forEach(parallax => {
-                this._createParallax(game, parallax);
-            });
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        _createParallax(game, parallax) {
-            const img_id = parallax.background_id;
-            const {height: scene_height} = game.scale;
-            //get the loaded image and its width
-            const img = game.textures.get(img_id);
-            const {width: bg_width} = img.frames.__BASE;
-            //create and cache the parallax tile sprite
-            const tile_sprite = game.add.tileSprite(bg_width / 2,
-                scene_height / 2,
-                bg_width,
-                scene_height,
-                img_id
-            );
-            tile_sprite.setAlpha(BACKGROUND_ALPHA);
-            parallax.tile_sprite = tile_sprite;
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        update() {
-            this.parallaxes.forEach(({tile_sprite, scroll_speed_x, scroll_speed_y}) => {
-                if (scroll_speed_x) {
-                    tile_sprite.tilePositionX -= scroll_speed_x;
-                }
-                if (scroll_speed_y) {
-                    tile_sprite.tilePositionY -= scroll_speed_y;
-                }
-            });
         }
     }
 
@@ -938,17 +841,231 @@
         return routine;
     }
 
-    let player_bullets;
-    let enemy_bullets;
-    let deadly_enemies;
+    class Enemy {
+        constructor(game, {type, id: sprite_id, routines}, sprite_group) {
+            this._createEventTracker(game, routines); //sets this.event_tracker
+            this._createSprite(game, sprite_id, sprite_group); //sets this.sprite
+            this._setMovementLimits(game, type); //sets this.limits
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createEventTracker(game, routines) {
+            const event_tracker = new EnemyEventTracker();
+            routines.forEach(({name: routine_name}) => {
+                event_tracker.addRoutine(createRoutine(game.cache.json.get(routine_name)));
+            });
+            this.event_tracker = event_tracker;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createSprite(game, sprite_id, sprite_group) {
+            const {x, y} = getPositionFromPercentages(BOSS_OFFSETS, game.scale);
+            const sprite = game.physics.add.image(x, y, sprite_id);
+            sprite.setDepth(1);
+            sprite_group.add(sprite);
+            this.sprite = sprite;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _setMovementLimits(game, type) {
+            const {width: scene_width, height: scene_height} = game.scale;
+            //Object to write limits into
+            this.limits = {};
+
+            //find out factors to multiple scene width/height with to find out limits
+            let multipliers;
+            switch (type) {
+                case 'boss':
+                    multipliers = BOSS_LIMITS;
+                    break;
+                default:
+                    //default enemies do not have defined limits, can move anywhere
+                    multipliers = {
+                        x_min: undefined,
+                        x_max: undefined,
+                        y_min: undefined,
+                        y_max: undefined,
+                    };
+                    break;
+            }
+
+            //calculate limits based on scene width/height and multipliers
+            ['x_min', 'x_max'].forEach(x_limit => {
+                if (multipliers[x_limit] === undefined) {
+                    this.limits[x_limit] = undefined;
+                } else {
+                    this.limits[x_limit] = multipliers[x_limit] * scene_width;
+                }
+            });
+            ['y_min', 'y_max'].forEach(y_limit => {
+                if (multipliers[y_limit] === undefined) {
+                    this.limits[y_limit] = undefined;
+                } else {
+                    this.limits[y_limit] = multipliers[y_limit] * scene_height;
+                }
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        update(game, shot_group) {
+            //transition routine, stop if all routines are done
+            if (!this._handleRoutineTransition()) {
+                return;
+            }
+            this._updateMovement();
+            this._createShots(game, shot_group);
+            //has to happen last, else events get gobbled
+            this.event_tracker.updateCurrentRoutine();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _handleRoutineTransition() {
+            if (this.event_tracker.isCurrentRoutineFinished()) {
+                if (this.event_tracker.existNextRoutine()) {
+                    this.event_tracker.advanceRoutine();
+                } else {
+                    //TODO: enemy is done here
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _updateMovement() {
+            let {x_acceleration,
+                y_acceleration,
+                x_velo,
+                y_velo,
+                can_leave
+            } = this.event_tracker.getNextMoves();
+
+            //ensure that random movements do stay within enemy's limits
+            if (!can_leave) {
+                //control x-movement
+                const {possible: x_move_possible, rem: x_rem} =
+                    checkSpriteXMovementPossible(this.sprite, this.limits);
+                if (!x_move_possible) {
+                    this.event_tracker.disableOngoingXMovement();
+                    this.sprite.x += x_rem;
+                    x_velo = 0;
+                }
+                //control y-movement
+                const {possible: y_move_possible, rem: y_rem} =
+                    checkSpriteYMovementPossible(this.sprite, this.limits);
+                if (!y_move_possible) {
+                    this.event_tracker.disableOngoingYMovement();
+                    this.sprite.y += y_rem;
+                    y_velo = 0;
+                }
+            }
+
+            //set new movement
+            this.sprite.setVelocityX(x_velo);
+            this.sprite.setVelocityY(y_velo);
+            this.sprite.setAccelerationX(x_acceleration);
+            this.sprite.setAccelerationY(y_acceleration);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createShots(game, shot_group) {
+            const next_shots = this.event_tracker.getNextShots();
+            if (!next_shots) {
+                return;
+            }
+            createMultipleShotSprites(game, next_shots, this.sprite, shot_group);
+        }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function makeAssetPath(suffix) {
+        return `${ASSET_PATH}/${suffix}`;
+    }
+
+    /**
+     * Based on level info JSON.
+     */
+    class Background {
+        constructor(bg_info) {
+            this.asset_folder = bg_info.folder;
+            this.parallaxes = bg_info.parallaxes;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        preload(game, asset_map) {
+            this.parallaxes.forEach(({background_id: img_id}) => {
+                const img_path = makeAssetPath(`${this.asset_folder}/${asset_map[img_id]}`);
+                game.load.image(img_id, img_path);
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        create(game) {
+            this.parallaxes.forEach(parallax => {
+                this._createParallax(game, parallax);
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createParallax(game, parallax) {
+            const img_id = parallax.background_id;
+            const {height: scene_height} = game.scale;
+            //get the loaded image and its width
+            const img = game.textures.get(img_id);
+            const {width: bg_width} = img.frames.__BASE;
+            //create and cache the parallax tile sprite
+            const tile_sprite = game.add.tileSprite(bg_width / 2,
+                scene_height / 2,
+                bg_width,
+                scene_height,
+                img_id
+            );
+            tile_sprite.setAlpha(BACKGROUND_ALPHA);
+            parallax.tile_sprite = tile_sprite;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        update() {
+            this.parallaxes.forEach(({tile_sprite, scroll_speed_x, scroll_speed_y}) => {
+                if (scroll_speed_x) {
+                    tile_sprite.tilePositionX -= scroll_speed_x;
+                }
+                if (scroll_speed_y) {
+                    tile_sprite.tilePositionY -= scroll_speed_y;
+                }
+            });
+        }
+    }
+
+    function handleHitPlayer(game, player) {
+        if (player.isInvincible()) {
+            return;
+        }
+        player.addToLives(-1);
+        player.triggerInvincibility(game);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function handleEnemyHit(bullet) {
+        bullet.destroy();
+    }
+
     //level progression
     let timer = 0;
     const enemy_events = {};
-    //copy
-    const enemy_infos = [];
-    const enemies_by_id = {};
-    //tracking info regarding the player
-    let remaining_invis_frames = 0;
 
     class FightScene extends Phaser.Scene {
         constructor() {
@@ -966,6 +1083,8 @@
 
             const level_base_info = this.cache.json.get('level_base_info');
             this.background = new Background(level_base_info.background);
+
+            this.active_enemies = [];
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1018,35 +1137,27 @@
         /*---------------------------------------------------------------------------*/
 
         create () {
+            //groups for enemies and bullets
+            this.player_bullets = this.physics.add.group();
+            this.enemy_bullets = this.physics.add.group();
+            this.deadly_enemies = this.physics.add.group();
+
             //background
             this.background.create(this);
-
-            //groups for enemies and bullets
-            player_bullets = this.physics.add.group();
-            enemy_bullets = this.physics.add.group();
-            deadly_enemies = this.physics.add.group();
 
             //player setup
             const player_sprite = this.player.create(this);
 
-            //setup collision detection of the distinct physics groups
-            this.physics.add.overlap(player_sprite, deadly_enemies, this.handlePlayerHit, null, this);
-            this.physics.add.overlap(player_sprite, enemy_bullets, this.handlePlayerHit, null, this);
-        }
+            //player collision handling
+            const player_hit = () => {
+                handleHitPlayer(this, this.player);
+            };
+            this.physics.add.overlap(player_sprite, this.deadly_enemies, player_hit);
+            this.physics.add.overlap(player_sprite, this.enemy_bullets, player_hit);
 
-        /*---------------------------------------------------------------------------*/
-
-        handlePlayerHit() {
-            //check if player is protected
-            if (remaining_invis_frames) {
-                remaining_invis_frames--;
-                return;
-            }
-            //if not, handle player hit
-
-
-            //set up invis frames after hit
-            remaining_invis_frames = INVIS_FRAMES_AFTER_HIT;
+            //enemy collision handling
+            this.physics.add.overlap(this.player_bullets, this.deadly_enemies,
+                handleEnemyHit);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1055,19 +1166,23 @@
             //check for game interruptions
             this.pauseGameIfRequested();
 
-            //cosmetic
+            //divide update step into sub-steps of game elements
+
+            //background
             this.background.update();
 
-            //move all objects to new positions
             //player
-            const {shots} = this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys);
-            //enemies
+            this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys, this.player_bullets);
+
+            //enemies by timeline
             this.createNewEnemies();
-            this.updateEnemies();
+            this.active_enemies.forEach(enemy => {
+                enemy.update(this, this.enemy_bullets);
+            });
 
             //cleanup
-            this.removeBulletsOutOfBounds(player_bullets);
-            this.removeBulletsOutOfBounds(enemy_bullets);
+            this.removeBulletsOutOfBounds(this.player_bullets);
+            this.removeBulletsOutOfBounds(this.enemy_bullets);
 
             //finalize
             timer++;
@@ -1103,139 +1218,11 @@
             if (!ids_to_spawn) return;
 
             enemy_events[timer].forEach(enemy_id => {
-                //create enemy sprite
-                const enemy_sprite = this.createEnemySprite(enemy_id);
-                //track the sprite
-                deadly_enemies.add(enemy_sprite);
-                enemies_by_id[enemy_id] = enemy_sprite;
-
-                //create information Object for the enemy
-                const enemy_info = this.createEnemyInfo(enemy_id, enemy_sprite);
-                //track the information
-                enemy_infos.push(enemy_info);
+                const enemy_base = this.cache.json.get(enemy_id);
+                //create the Object to track the enemy and control its sprite
+                const enemy = new Enemy(this, enemy_base, this.deadly_enemies);
+                this.active_enemies.push(enemy);
             });
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        createEnemySprite(enemy_id) {
-            //create sprite at position defined by offsets in globals
-            const {x: enemy_x, y: enemy_y} = getPositionFromPercentages(BOSS_OFFSETS, this.scale);
-            const enemy = this.physics.add.image(enemy_x, enemy_y, enemy_id);
-            enemy.setDepth(1);
-            return enemy;
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        createEnemyInfo(enemy_id, enemy_sprite) {
-            const {width: scene_width, height: scene_height} = this.scale;
-
-            //get the enemies blueprint as noted in JSON file
-            const enemy_base = this.cache.json.get(enemy_id);
-            //create the Object to hold enemy information
-            const enemy_info = new Enemy(enemy_id, enemy_sprite, enemy_base.type,
-                scene_width, scene_height);
-            //add information on the used Routines
-            enemy_base.routines.forEach(({name: routine_name}) => {
-                enemy_info.addRoutine(createRoutine(this.cache.json.get(routine_name)));
-            });
-
-            return enemy_info;
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        updateEnemies() {
-            enemy_infos.forEach(enemy_info => {
-                const enemy = enemies_by_id[enemy_info.id];
-
-                //handle routine transitions
-                if (enemy_info.isCurrentRoutineFinished()) {
-                    if (enemy_info.existNextRoutine()) {
-                        enemy_info.advanceRoutine();
-                    }
-                }
-
-                //update enemy itself
-                this.updateEnemyMovement(enemy, enemy_info);
-
-                //handle enemy shooting as dictated by its routine
-                const shot_infos = enemy_info.getNextShots();
-                shot_infos && shot_infos.forEach(shot_info => {
-                    this.createNewEnemyShot(shot_info, enemy);
-                });
-
-                //move routine to next step
-                enemy_info.updateCurrentRoutine();
-            });
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        updateEnemyMovement(enemy, enemy_info) {
-            const move_info = enemy_info.getNextMoves();
-            let {x_acceleration, y_acceleration, x_velo, y_velo, can_leave} = move_info;
-
-            //ensure that random movements do stay within enemy's limits
-            if (!can_leave) {
-                const limits = enemy_info.getLimits();
-                //control x-movement
-                const {possible: x_move_possible, rem: x_rem} =
-                    checkSpriteXMovementPossible(enemy, limits);
-                if (!x_move_possible) {
-                    enemy_info.disableOngoingXMovement();
-                    enemy.x += x_rem;
-                    x_velo = 0;
-                }
-                //control y-movement
-                const {possible: y_move_possible, rem: y_rem} =
-                    checkSpriteYMovementPossible(enemy, limits);
-                if (!y_move_possible) {
-                    enemy_info.disableOngoingYMovement();
-                    enemy.y += y_rem;
-                    y_velo = 0;
-                }
-            }
-
-            //set new movement
-            enemy.setVelocityX(x_velo);
-            enemy.setVelocityY(y_velo);
-            enemy.setAccelerationX(x_acceleration);
-            enemy.setAccelerationY(y_acceleration);
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        createNewEnemyShot(shot_info, {x: enemy_x, y: enemy_y, width: enemy_width,
-            height: enemy_height}) {
-            //create the shot in the game world
-            const {shot_id, x_offset, y_offset} = shot_info;
-            let shot_x = enemy_x + x_offset;
-            let shot_y = enemy_y + y_offset;
-            switch (shot_info.anchor) {
-                case 'Top':
-                    shot_y -= enemy_height/2;
-                    break;
-                case 'Bottom':
-                    shot_y += enemy_height/2;
-                    break;
-                case 'Left':
-                    shot_x -= enemy_width/2;
-                    break;
-                case 'Right':
-                    shot_x += enemy_width/2;
-                    break;
-            }
-            const shot = this.physics.add.image(shot_x, shot_y, shot_id);
-
-            //track shot for collision detection with player
-            enemy_bullets.add(shot);
-
-            //apply physics properties to the shot
-            const {x_velo, y_velo} = shot_info;
-            shot.setVelocityX(x_velo);
-            shot.setVelocityY(y_velo);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1362,9 +1349,9 @@
         /**
          * @returns {Phaser.Timer} - the timer that was started within the debounce
          */
-        debounceKey(key, delay, scene) {
+        debounceKey(key, delay, game) {
             this.setKeyBlocked(key);
-            return scene.time.addEvent({
+            return game.time.addEvent({
                 delay: delay,
                 callback: () => {
                     this.setKeyUnblocked(key);

@@ -16,6 +16,6 @@
     "normal": 840,
     "slowed": 320
   },
-  "invincibility_window": 500,
+  "invincibility_window": 2000,
   "lives": 3
 }

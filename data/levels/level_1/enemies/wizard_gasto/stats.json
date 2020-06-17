@@ -3,9 +3,7 @@
   "id": "wizard_gasto",
   "type": "boss",
   "routines": [
-    {
-      "name": "twister_test"
-    },
+
     {
       "name": "circle_test"
     }

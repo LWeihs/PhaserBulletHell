@@ -1,7 +1,8 @@
-import {divideDistXAndY} from "./geometry_helpers";
-import {getPositionFromPercentages} from "./SpriteHelpers";
+import {
+    PLAYER_OFFSETS
+} from "./Globals";
 import {createMultipleShotSprites} from "./Shot";
-import {PLAYER_OFFSETS} from "./globals";
+import {getPositionFromPercentages} from "./SpriteHelpers";
 
 export default class Player {
     constructor({asset_folder, weapon, movement, invincibility_window, lives}) {
@@ -15,11 +16,17 @@ export default class Player {
         this.movement = movement; //normal, slowed
         this.invis_frames = {
             max: invincibility_window,
-            remaining: 0,
+            active: false,
         };
         this.cur_lives = lives;
         //properties to fill
         this.sprite = null;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    isInvincible() {
+        return this.invis_frames.active;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -36,13 +43,9 @@ export default class Player {
 
     /*---------------------------------------------------------------------------*/
 
-    update(game, active_keys) {
+    update(game, active_keys, shot_group) {
         this._updateMovement(active_keys);
-        const created_shots = this._createShots(game, active_keys);
-        //return info on created physics entities during update step
-        return {
-            shots: created_shots,
-        }
+        this._createShots(game, active_keys, shot_group);
     }
 
     /*---------------------------------------------------------------------------*/
@@ -79,16 +82,34 @@ export default class Player {
 
     /*---------------------------------------------------------------------------*/
 
-    _createShots(game, active_keys) {
+    _createShots(game, active_keys, shot_group) {
         const {FIRE: fire_btn_active} = active_keys;
         if (fire_btn_active) {
             if (this.weapon.cooldown <= 0) {
                 this.weapon.cooldown = this.weapon.fire_rate;
-                return createMultipleShotSprites(game, this.weapon.shots, this.sprite);
+                createMultipleShotSprites(game, this.weapon.shots, this.sprite,
+                    shot_group);
             } else {
                 this.weapon.cooldown--;
             }
         }
-        return [];
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    addToLives(addend) {
+        this.cur_lives += addend;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    triggerInvincibility(game) {
+        this.invis_frames.active = true;
+        game.time.addEvent({
+            delay: this.invis_frames.max,
+            callback: () => {
+                this.invis_frames.active = false;
+            },
+        });
     }
 }

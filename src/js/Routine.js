@@ -1,8 +1,8 @@
-import {divideDistXAndY} from "./geometry_helpers";
+import {divideDistXAndY} from "./GeometryHelpers";
 import {
     getEntryModulo,
     makeArrayFromIntervals,
-} from "./generic_helpers";
+} from "./GenericHelpers";
 
 export default class Routine {
     constructor({name, loops, duration, hp}) {
