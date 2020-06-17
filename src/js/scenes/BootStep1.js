@@ -41,11 +41,14 @@ export default class BootStep1 extends Phaser.Scene
 
         //load player information
         this.load.json('player_info', `${PLAYER_JSON_PATH}/kuglis.json`);
+
+        //load level base information (backgrounds)
+        this.load.json('level_base_info', `${LEVEL_JSON_PATH}/${level_id}/level_info.json`);
         //load level event timeline
         this.load.json('level_event_info', `${LEVEL_JSON_PATH}/${level_id}/events.json`);
         //load level scripting information
         this.load.json('level_json_keys', `${LEVEL_JSON_PATH}/${level_id}/json_keys.json`);
-        //load level asset information
+        //load level asset information (is map)
         this.load.json('level_asset_info', `${LEVEL_JSON_PATH}/${level_id}/asset_map.json`);
     }
 

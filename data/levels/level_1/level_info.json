@@ -1,0 +1,11 @@
+{
+  "background": {
+    "folder": "level_1_backgrounds",
+    "parallaxes": [
+      {
+        "background_id": "gasto_tower",
+        "scroll_speed_y": 3
+      }
+    ]
+  }
+}

@@ -2,10 +2,20 @@
   "asset_folder": "kuglis",
   "weapon": {
     "fire_rate": 5,
-    "bullet_speed": 580
+    "shots": [
+      {
+        "shot_id": "player_bullet",
+        "x_offset": 0,
+        "y_offset": 0,
+        "degree": 180,
+        "speed": 580
+      }
+    ]
   },
   "movement": {
     "normal": 840,
     "slowed": 320
-  }
+  },
+  "invincibility_window": 500,
+  "lives": 3
 }

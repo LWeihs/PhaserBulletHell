@@ -1,14 +1,14 @@
 import {
     FIGHT_SCENE_KEY,
     PAUSE_SCENE_KEY,
-    PLAYER_OFFSETS,
     BOSS_OFFSETS,
-    ASSET_PATH,
     BACKGROUND_ALPHA,
     DEFAULT_SCROLL_SPEED,
     INVIS_FRAMES_AFTER_HIT,
 } from "../globals";
+import Player from "../Player";
 import Enemy from "../enemy";
+import Background from "../Background";
 import {
     createRoutine,
 } from "../jsonToObjects";
@@ -17,6 +17,7 @@ import {
     checkSpriteYMovementPossible,
     getPositionFromPercentages,
 } from "../SpriteHelpers";
+import {makeAssetPath} from "../ProjectHelpers";
 
 //globals filled during execution
 let player;
@@ -47,6 +48,11 @@ export default class FightScene extends Phaser.Scene {
 
     init(global_data) {
         this.GLOBAL = global_data;
+
+        this.player = new Player(this.cache.json.get('player_info'));
+
+        const level_base_info = this.cache.json.get('level_base_info');
+        this.background = new Background(level_base_info.background);
     }
 
     /*---------------------------------------------------------------------------*/
@@ -55,19 +61,15 @@ export default class FightScene extends Phaser.Scene {
         this.preloadLevelAssets();
         this.setUpEventTimeline();
 
-        const {asset_folder, weapon} = this.cache.json.get('player_info');
-        cooldown = weapon.fire_rate;
+        //player
+        const player_info = this.cache.json.get('player_info');
+        const {asset_folder} = player_info;
+        this.load.image('player_sprite', makeAssetPath(`${asset_folder}/sprite.png`));
+        this.load.image('player_bullet', makeAssetPath(`${asset_folder}/bullet.png`));
 
-        this.load.image('player_sprite', this.makeAssetPath(`${asset_folder}/sprite.png`));
-        this.load.image('player_bullet', this.makeAssetPath(`${asset_folder}/bullet.png`));
         //background
-        this.load.image('background_shapes', this.makeAssetPath('level 1/parallax_1.png'));
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    makeAssetPath(suffix) {
-        return `${ASSET_PATH}/${suffix}`;
+        const asset_map = this.cache.json.get('level_asset_info');
+        this.background.preload(this, asset_map);
     }
 
     /*---------------------------------------------------------------------------*/
@@ -75,7 +77,7 @@ export default class FightScene extends Phaser.Scene {
     preloadLevelAssets() {
         Object.entries(this.cache.json.get('level_asset_info'))
             .forEach(([key, file_path]) => {
-            this.load.image(key, this.makeAssetPath(file_path));
+            this.load.image(key, makeAssetPath(file_path));
         });
     }
 
@@ -104,7 +106,7 @@ export default class FightScene extends Phaser.Scene {
 
     create () {
         //background
-        this.setUpBackground();
+        this.background.create(this);
 
         //groups for enemies and bullets
         player_bullets = this.physics.add.group();
@@ -112,37 +114,11 @@ export default class FightScene extends Phaser.Scene {
         deadly_enemies = this.physics.add.group();
 
         //player setup
-        player = this.createPlayerSprite();
+        const player_sprite = this.player.create(this);
 
         //setup collision detection of the distinct physics groups
-        this.physics.add.overlap(player, deadly_enemies, this.handlePlayerHit, null, this);
-        this.physics.add.overlap(player, enemy_bullets, this.handlePlayerHit, null, this);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    setUpBackground() {
-        const {height: scene_height} = this.scale;
-        const bg = this.textures.get('background_shapes');
-        const {width: bg_width} = bg.frames.__BASE;
-        this.firstParallax = this.add.tileSprite(bg_width / 2,
-            scene_height / 2,
-            bg_width,
-            scene_height,
-            'background_shapes'
-        );
-        this.firstParallax.setAlpha(BACKGROUND_ALPHA);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    createPlayerSprite() {
-        const {x: player_x, y: player_y} =
-            getPositionFromPercentages(PLAYER_OFFSETS, this.scale);
-        const player = this.physics.add.image(player_x, player_y, 'player_sprite');
-        player.setCollideWorldBounds(true);
-        player.setDepth(1);
-        return player;
+        this.physics.add.overlap(player_sprite, deadly_enemies, this.handlePlayerHit, null, this);
+        this.physics.add.overlap(player_sprite, enemy_bullets, this.handlePlayerHit, null, this);
     }
 
     /*---------------------------------------------------------------------------*/
@@ -167,12 +143,11 @@ export default class FightScene extends Phaser.Scene {
         this.pauseGameIfRequested();
 
         //cosmetic
-        this.updateBackground();
+        this.background.update();
 
         //move all objects to new positions
         //player
-        this.playerMove();
-        this.playerFire();
+        const {shots} = this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys);
         //enemies
         this.createNewEnemies();
         this.updateEnemies();
@@ -206,64 +181,6 @@ export default class FightScene extends Phaser.Scene {
         }
         //halt update + render for main game
         this.scene.pause();
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    updateBackground() {
-        this.firstParallax.tilePositionY -= DEFAULT_SCROLL_SPEED;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    playerMove() {
-        //get information on which keys are active from shared globals
-        const {
-            UP: up_active,
-            DOWN: down_active,
-            LEFT: left_active,
-            RIGHT: right_active,
-            SLOW: slow_active,
-        } = this.GLOBAL.KEY_TRACKER.active_keys;
-
-        //determine player speed
-        const {movement} = this.cache.json.get('player_info');
-        const speed = slow_active ? movement.slowed : movement.normal;
-
-        //set velocity based on speed and active movement keys
-        let x_velo = 0, y_velo = 0;
-        if (up_active) {
-            y_velo -= speed;
-        }
-        if (down_active) {
-            y_velo += speed;
-        }
-        if (left_active) {
-            x_velo -= speed;
-        }
-        if (right_active) {
-            x_velo += speed;
-        }
-        player.setVelocityX(x_velo);
-        player.setVelocityY(y_velo);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    playerFire() {
-        const {FIRE: fire_btn_active} = this.GLOBAL.KEY_TRACKER.active_keys;
-        const {weapon} = this.cache.json.get('player_info');
-        if (fire_btn_active) {
-            //if weapon is ready, create new player bullet
-            if (recharge === 0) {
-                const bullet = player_bullets.create(player.x, player.y - player.height,
-                    'player_bullet');
-                bullet.setVelocityY(-weapon.bullet_speed);
-                recharge = cooldown;
-            } else {
-                recharge--;
-            }
-        }
     }
 
     /*---------------------------------------------------------------------------*/

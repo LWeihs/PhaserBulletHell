@@ -29,7 +29,6 @@
     /** BACKGROUNDS **/
 
     const BACKGROUND_ALPHA = 0.5;
-    const DEFAULT_SCROLL_SPEED = 2;
 
     /** PAUSE MENU **/
 
@@ -69,6 +68,265 @@
     /** PLAYER INFORMATION (SAME BETWEEN ALL PLAYERS) **/
 
     const INVIS_FRAMES_AFTER_HIT = 60;
+
+    function divideDistXAndY(dist, angle, isRadian = true) {
+        angle = isRadian ? angle : degreeToRadian(angle);
+        return {
+            x: dist * Math.sin(angle),
+            y: dist * Math.cos(angle),
+        };
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function degreeToRadian(degree) {
+        return degree * Math.PI/180;
+    }
+
+    function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        const dx = getSpriteDxPerFrame(sprite);
+        if (dx < 0) {
+            res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
+            if (dx < res.rem) {
+                res.possible = false;
+            }
+        } else if (dx > 0) {
+            res.rem = calcDistanceSpriteToLimitRight(sprite, x_max);
+            if (dx > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function checkSpriteYMovementPossible(sprite, {y_min, y_max}) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        const dy = getSpriteDyPerFrame(sprite);
+        if (dy < 0) {
+            res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
+            if (dy < res.rem) {
+                res.possible = false;
+            }
+        } else if (dy > 0) {
+            res.rem = calcDistanceSpriteToLimitDown(sprite, y_max);
+            if (dy > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitLeft(sprite, x_min) {
+        return sprite.x - sprite.body.halfWidth - x_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitRight(sprite, x_max) {
+        return x_max - (sprite.x + sprite.body.halfWidth);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitUp(sprite, y_min) {
+        return sprite.y - sprite.body.halfHeight - y_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitDown(sprite, y_max) {
+        return y_max - (sprite.y + sprite.body.halfHeight);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDxPerFrame(sprite) {
+        return sprite.body._dx;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDyPerFrame(sprite) {
+        return sprite.body._dy;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getPositionFromPercentages({x: percentage_x, y: percentage_y},
+                                        {width: scene_width, height: scene_height}) {
+        return {
+            x: percentage_x * scene_width,
+            y: percentage_y * scene_height,
+        };
+    }
+
+    function createMultipleShotSprites(game, shot_infos, reference) {
+        const shot_sprites = [];
+        shot_infos.forEach(shot_info => {
+            shot_sprites.push(createShotSprite(game, shot_info, reference));
+        });
+        return shot_sprites;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function createShotSprite(game, shot_info, reference) {
+        let {
+            shot_id, //ID of the shot image (in game's cache)
+            x_offset, //x-offset from reference
+            y_offset, //y-offset from reference
+            anchor, //side (or middle) of reference to anchor shot to
+
+            //-- multiple alternatives to express shot's velocity --
+
+            //ALTERNATIVE 1
+            x_velo, //the shot's velocity in x-direction
+            y_velo, //the shot's velocity in y-direction
+
+            //ALTERNATIVE 2
+            degree, //degree (from start point) to angle shot at
+            speed, //speed to divide into x- and y-velocity
+        } = shot_info;
+        const {
+            x: ref_x,
+            y: ref_y,
+            width: ref_width,
+            height: ref_height,
+        } = reference;
+
+        //find placement of shot based on given information
+        let shot_x = ref_x + x_offset;
+        let shot_y = ref_y + y_offset;
+        switch(anchor) {
+            case 'Top':
+                shot_y -= ref_height/2;
+                break;
+            case 'Bottom':
+                shot_y += ref_height/2;
+                break;
+            case 'Left':
+                shot_x -= ref_width/2;
+                break;
+            case 'Right':
+                shot_x += ref_width/2;
+                break;
+        }
+
+        //create the shot as physical image in the game world at placement
+        const shot = game.physics.add.image(shot_x, shot_y, shot_id);
+
+        //find values to use for x- and y-velocity of shot
+        if (!x_velo) {
+            //ALTERNATIVE 2
+            ({x: x_velo, y: y_velo} = divideDistXAndY(speed, degree, false));
+        }
+        shot.setVelocityX(x_velo);
+        shot.setVelocityY(y_velo);
+
+        //return the created physics object
+        return shot;
+    }
+
+    class Player {
+        constructor({asset_folder, weapon, movement, invincibility_window, lives}) {
+            //inferred properties
+            this.asset_folder = asset_folder;
+            this.weapon = {
+                fire_rate: weapon.fire_rate,
+                shots: weapon.shots,
+                cooldown: 0,
+            };
+            this.movement = movement; //normal, slowed
+            this.invis_frames = {
+                max: invincibility_window,
+                remaining: 0,
+            };
+            this.cur_lives = lives;
+            //properties to fill
+            this.sprite = null;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        create(game) {
+            const {x: player_x, y: player_y} =
+                getPositionFromPercentages(PLAYER_OFFSETS, game.scale);
+            const player_sprite = game.physics.add.image(player_x, player_y, 'player_sprite');
+            player_sprite.setCollideWorldBounds(true);
+            player_sprite.setDepth(1);
+            this.sprite = player_sprite;
+            return player_sprite;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        update(game, active_keys) {
+            this._updateMovement(active_keys);
+            const created_shots = this._createShots(game, active_keys);
+            //return info on created physics entities during update step
+            return {
+                shots: created_shots,
+            }
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _updateMovement(active_keys) {
+            const {
+                UP: up_active,
+                DOWN: down_active,
+                LEFT: left_active,
+                RIGHT: right_active,
+                SLOW: slow_active,
+            } = active_keys;
+
+            //determine player speed
+            const speed = slow_active ? this.movement.slowed : this.movement.normal;
+
+            //set velocity based on speed and active movement keys
+            let x_velo = 0, y_velo = 0;
+            if (up_active) {
+                y_velo -= speed;
+            }
+            if (down_active) {
+                y_velo += speed;
+            }
+            if (left_active) {
+                x_velo -= speed;
+            }
+            if (right_active) {
+                x_velo += speed;
+            }
+            this.sprite.setVelocityX(x_velo);
+            this.sprite.setVelocityY(y_velo);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createShots(game, active_keys) {
+            const {FIRE: fire_btn_active} = active_keys;
+            if (fire_btn_active) {
+                if (this.weapon.cooldown <= 0) {
+                    this.weapon.cooldown = this.weapon.fire_rate;
+                    return createMultipleShotSprites(game, this.weapon.shots, this.sprite);
+                } else {
+                    this.weapon.cooldown--;
+                }
+            }
+            return [];
+        }
+    }
 
     class Enemy {
         constructor(id, sprite, type, scene_width, scene_height) {
@@ -195,18 +453,69 @@
         }
     }
 
-    function divideDistXAndY(dist, angle, isRadian = true) {
-        angle = isRadian ? angle : degreeToRadian(angle);
-        return {
-            x: dist * Math.sin(angle),
-            y: dist * Math.cos(angle),
-        };
-    }
-
     /*---------------------------------------------------------------------------*/
 
-    function degreeToRadian(degree) {
-        return degree * Math.PI/180;
+    function makeAssetPath(suffix) {
+        return `${ASSET_PATH}/${suffix}`;
+    }
+
+    /**
+     * Based on level info JSON.
+     */
+    class Background {
+        constructor(bg_info) {
+            this.asset_folder = bg_info.folder;
+            this.parallaxes = bg_info.parallaxes;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        preload(game, asset_map) {
+            this.parallaxes.forEach(({background_id: img_id}) => {
+                const img_path = makeAssetPath(`${this.asset_folder}/${asset_map[img_id]}`);
+                game.load.image(img_id, img_path);
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        create(game) {
+            this.parallaxes.forEach(parallax => {
+                this._createParallax(game, parallax);
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _createParallax(game, parallax) {
+            const img_id = parallax.background_id;
+            const {height: scene_height} = game.scale;
+            //get the loaded image and its width
+            const img = game.textures.get(img_id);
+            const {width: bg_width} = img.frames.__BASE;
+            //create and cache the parallax tile sprite
+            const tile_sprite = game.add.tileSprite(bg_width / 2,
+                scene_height / 2,
+                bg_width,
+                scene_height,
+                img_id
+            );
+            tile_sprite.setAlpha(BACKGROUND_ALPHA);
+            parallax.tile_sprite = tile_sprite;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        update() {
+            this.parallaxes.forEach(({tile_sprite, scroll_speed_x, scroll_speed_y}) => {
+                if (scroll_speed_x) {
+                    tile_sprite.tilePositionX -= scroll_speed_x;
+                }
+                if (scroll_speed_y) {
+                    tile_sprite.tilePositionY -= scroll_speed_y;
+                }
+            });
+        }
     }
 
     function getEntryModulo(arr, i) {
@@ -629,101 +938,9 @@
         return routine;
     }
 
-    function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
-        const res = {
-            possible: true,
-            rem: undefined, //remaining available move space
-        };
-        const dx = getSpriteDxPerFrame(sprite);
-        if (dx < 0) {
-            res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
-            if (dx < res.rem) {
-                res.possible = false;
-            }
-        } else if (dx > 0) {
-            res.rem = calcDistanceSpriteToLimitRight(sprite, x_max);
-            if (dx > res.rem) {
-                res.possible = false;
-            }
-        }
-        return res;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function checkSpriteYMovementPossible(sprite, {y_min, y_max}) {
-        const res = {
-            possible: true,
-            rem: undefined, //remaining available move space
-        };
-        const dy = getSpriteDyPerFrame(sprite);
-        if (dy < 0) {
-            res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
-            if (dy < res.rem) {
-                res.possible = false;
-            }
-        } else if (dy > 0) {
-            res.rem = calcDistanceSpriteToLimitDown(sprite, y_max);
-            if (dy > res.rem) {
-                res.possible = false;
-            }
-        }
-        return res;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitLeft(sprite, x_min) {
-        return sprite.x - sprite.body.halfWidth - x_min;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitRight(sprite, x_max) {
-        return x_max - (sprite.x + sprite.body.halfWidth);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitUp(sprite, y_min) {
-        return sprite.y - sprite.body.halfHeight - y_min;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitDown(sprite, y_max) {
-        return y_max - (sprite.y + sprite.body.halfHeight);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getSpriteDxPerFrame(sprite) {
-        return sprite.body._dx;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getSpriteDyPerFrame(sprite) {
-        return sprite.body._dy;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getPositionFromPercentages({x: percentage_x, y: percentage_y},
-                                        {width: scene_width, height: scene_height}) {
-        return {
-            x: percentage_x * scene_width,
-            y: percentage_y * scene_height,
-        };
-    }
-
-    //globals filled during execution
-    let player;
     let player_bullets;
     let enemy_bullets;
     let deadly_enemies;
-    //player
-    let recharge = 0, cooldown = 0;
     //level progression
     let timer = 0;
     const enemy_events = {};
@@ -744,6 +961,11 @@
 
         init(global_data) {
             this.GLOBAL = global_data;
+
+            this.player = new Player(this.cache.json.get('player_info'));
+
+            const level_base_info = this.cache.json.get('level_base_info');
+            this.background = new Background(level_base_info.background);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -752,19 +974,15 @@
             this.preloadLevelAssets();
             this.setUpEventTimeline();
 
-            const {asset_folder, weapon} = this.cache.json.get('player_info');
-            cooldown = weapon.fire_rate;
+            //player
+            const player_info = this.cache.json.get('player_info');
+            const {asset_folder} = player_info;
+            this.load.image('player_sprite', makeAssetPath(`${asset_folder}/sprite.png`));
+            this.load.image('player_bullet', makeAssetPath(`${asset_folder}/bullet.png`));
 
-            this.load.image('player_sprite', this.makeAssetPath(`${asset_folder}/sprite.png`));
-            this.load.image('player_bullet', this.makeAssetPath(`${asset_folder}/bullet.png`));
             //background
-            this.load.image('background_shapes', this.makeAssetPath('level 1/parallax_1.png'));
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        makeAssetPath(suffix) {
-            return `${ASSET_PATH}/${suffix}`;
+            const asset_map = this.cache.json.get('level_asset_info');
+            this.background.preload(this, asset_map);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -772,7 +990,7 @@
         preloadLevelAssets() {
             Object.entries(this.cache.json.get('level_asset_info'))
                 .forEach(([key, file_path]) => {
-                this.load.image(key, this.makeAssetPath(file_path));
+                this.load.image(key, makeAssetPath(file_path));
             });
         }
 
@@ -801,7 +1019,7 @@
 
         create () {
             //background
-            this.setUpBackground();
+            this.background.create(this);
 
             //groups for enemies and bullets
             player_bullets = this.physics.add.group();
@@ -809,37 +1027,11 @@
             deadly_enemies = this.physics.add.group();
 
             //player setup
-            player = this.createPlayerSprite();
+            const player_sprite = this.player.create(this);
 
             //setup collision detection of the distinct physics groups
-            this.physics.add.overlap(player, deadly_enemies, this.handlePlayerHit, null, this);
-            this.physics.add.overlap(player, enemy_bullets, this.handlePlayerHit, null, this);
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        setUpBackground() {
-            const {height: scene_height} = this.scale;
-            const bg = this.textures.get('background_shapes');
-            const {width: bg_width} = bg.frames.__BASE;
-            this.firstParallax = this.add.tileSprite(bg_width / 2,
-                scene_height / 2,
-                bg_width,
-                scene_height,
-                'background_shapes'
-            );
-            this.firstParallax.setAlpha(BACKGROUND_ALPHA);
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        createPlayerSprite() {
-            const {x: player_x, y: player_y} =
-                getPositionFromPercentages(PLAYER_OFFSETS, this.scale);
-            const player = this.physics.add.image(player_x, player_y, 'player_sprite');
-            player.setCollideWorldBounds(true);
-            player.setDepth(1);
-            return player;
+            this.physics.add.overlap(player_sprite, deadly_enemies, this.handlePlayerHit, null, this);
+            this.physics.add.overlap(player_sprite, enemy_bullets, this.handlePlayerHit, null, this);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -864,12 +1056,11 @@
             this.pauseGameIfRequested();
 
             //cosmetic
-            this.updateBackground();
+            this.background.update();
 
             //move all objects to new positions
             //player
-            this.playerMove();
-            this.playerFire();
+            const {shots} = this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys);
             //enemies
             this.createNewEnemies();
             this.updateEnemies();
@@ -903,64 +1094,6 @@
             }
             //halt update + render for main game
             this.scene.pause();
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        updateBackground() {
-            this.firstParallax.tilePositionY -= DEFAULT_SCROLL_SPEED;
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        playerMove() {
-            //get information on which keys are active from shared globals
-            const {
-                UP: up_active,
-                DOWN: down_active,
-                LEFT: left_active,
-                RIGHT: right_active,
-                SLOW: slow_active,
-            } = this.GLOBAL.KEY_TRACKER.active_keys;
-
-            //determine player speed
-            const {movement} = this.cache.json.get('player_info');
-            const speed = slow_active ? movement.slowed : movement.normal;
-
-            //set velocity based on speed and active movement keys
-            let x_velo = 0, y_velo = 0;
-            if (up_active) {
-                y_velo -= speed;
-            }
-            if (down_active) {
-                y_velo += speed;
-            }
-            if (left_active) {
-                x_velo -= speed;
-            }
-            if (right_active) {
-                x_velo += speed;
-            }
-            player.setVelocityX(x_velo);
-            player.setVelocityY(y_velo);
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        playerFire() {
-            const {FIRE: fire_btn_active} = this.GLOBAL.KEY_TRACKER.active_keys;
-            const {weapon} = this.cache.json.get('player_info');
-            if (fire_btn_active) {
-                //if weapon is ready, create new player bullet
-                if (recharge === 0) {
-                    const bullet = player_bullets.create(player.x, player.y - player.height,
-                        'player_bullet');
-                    bullet.setVelocityY(-weapon.bullet_speed);
-                    recharge = cooldown;
-                } else {
-                    recharge--;
-                }
-            }
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1273,11 +1406,14 @@
 
             //load player information
             this.load.json('player_info', `${PLAYER_JSON_PATH}/kuglis.json`);
+
+            //load level base information (backgrounds)
+            this.load.json('level_base_info', `${LEVEL_JSON_PATH}/${level_id}/level_info.json`);
             //load level event timeline
             this.load.json('level_event_info', `${LEVEL_JSON_PATH}/${level_id}/events.json`);
             //load level scripting information
             this.load.json('level_json_keys', `${LEVEL_JSON_PATH}/${level_id}/json_keys.json`);
-            //load level asset information
+            //load level asset information (is map)
             this.load.json('level_asset_info', `${LEVEL_JSON_PATH}/${level_id}/asset_map.json`);
         }
 
