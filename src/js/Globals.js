@@ -1,90 +1,92 @@
-/** SCENE KEYS **/
+const GLOBALS = {
+    /** SCENE KEYS **/
+    BOOT_1_SCENE_KEY: 'boot1',
+    BOOT_2_SCENE_KEY: 'boot2',
+    FIGHT_SCENE_KEY: 'fight',
+    PAUSE_SCENE_KEY: 'pause',
+    KEY_TRACKER_KEY: 'key_tracker',
 
-const BOOT_1_SCENE_KEY = 'boot1';
-const BOOT_2_SCENE_KEY = 'boot2';
-const FIGHT_SCENE_KEY = 'fight';
-const PAUSE_SCENE_KEY = 'pause';
-const KEY_TRACKER_KEY = 'key_tracker';
+    /** KEY BINDINGS **/
+    KEY_BINDINGS: {
+        //player movement
+        UP: {type: 'cursor', key: 'up'},
+        DOWN: {type: 'cursor', key: 'down'},
+        LEFT: {type: 'cursor', key: 'left'},
+        RIGHT: {type: 'cursor', key: 'right'},
+        //player actions
+        SLOW: {type: 'cursor', key: 'shift'},
+        FIRE: {type: 'keyboard', key: 'Y'},
+        SPECIAL: {type: 'keyboard', key: 'X'},
+        //general
+        PAUSE: {type: 'keyboard', key: 'ESC'},
+        ENTER: {type: 'keyboard', key: 'ENTER'},
+    },
 
-/** KEY BINDINGS **/
+    /** BACKGROUNDS **/
 
-const KEY_BINDINGS = {
-    //player movement
-    UP: {type: 'cursor', key: 'up'},
-    DOWN: {type: 'cursor', key: 'down'},
-    LEFT: {type: 'cursor', key: 'left'},
-    RIGHT: {type: 'cursor', key: 'right'},
-    SLOW: {type: 'cursor', key: 'shift'},
-    FIRE: {type: 'keyboard', key: 'Y'},
-    //general
-    PAUSE: {type: 'keyboard', key: 'ESC'},
-    ENTER: {type: 'keyboard', key: 'ENTER'},
+    BACKGROUND_ALPHA: 0.5,
+
+    /** PAUSE MENU **/
+
+    PAUSE_INPUT_DEBOUNCE_INITIAL_MS: 500,
+    PAUSE_INPUT_DEBOUNCE_QUICK_MS: 250,
+    PAUSE_OVERLAY_ALPHA: 0.94,
+    PAUSE_MENU_UPPER_LEFT: {
+        x: 1 / 20,
+        y: 6 / 10,
+    },
+    PAUSE_MENU_Y_OFFSET: 1 / 100,
+
+    /** POSITIONING **/
+
+    PLAYER_OFFSETS: {
+        x: 1 / 2,
+        y: 9 / 10,
+    },
+    BOSS_OFFSETS: {
+        x: 1 / 2,
+        y: 1 / 10,
+    },
+    BOSS_LIMITS: {
+        x_min: 0,
+        x_max: 1,
+        y_min: 0,
+        y_max: 0.42,
+    },
+
+    /** FOLDER STRUCTURE **/
+
+    ASSET_PATH: 'assets',
+    MENU_ASSETS_FOLDER: 'menu',
+    PLAYER_JSON_PATH: 'player',
+    LEVEL_JSON_PATH: 'levels',
+
+    /** PLAYER INFORMATION (SAME BETWEEN ALL PLAYERS) **/
+
+    INVIS_FRAMES_AFTER_HIT: 60,
+    ENERGY_PASSIVE_ACCUMULATION: 2,
+    ENERGY_ACCUMULATION_INTERVAL: 100, //ms
+
+    /** PLAYER SPECIALS **/
+
+    PLAYER_BLINK_DISTANCE: 100,
+
+    /** GAME STATE INFORMATION **/
+
+    PLAYER_MAX_LIVES: 99,
+
+    /** UI **/
+    ENERGY_METER: {
+        MIDPOINT_OFFSETS: {
+            x: 1 / 2,
+            y: 29 / 30,
+        },
+        WIDTH: 400,
+        HEIGHT: 20,
+        BG_COLOR: 0xffcccc,
+        FILL_COLOR: 0x29a329,
+        BORDER_WIDTH: 4,
+    },
 };
 
-/** BACKGROUNDS **/
-
-const BACKGROUND_ALPHA = 0.5;
-const DEFAULT_SCROLL_SPEED = 2;
-
-/** PAUSE MENU **/
-
-const PAUSE_INPUT_DEBOUNCE_INITIAL_MS = 500;
-const PAUSE_INPUT_DEBOUNCE_QUICK_MS = 250;
-const PAUSE_OVERLAY_ALPHA = 0.94;
-const PAUSE_MENU_UPPER_LEFT = {
-    x: 1/20,
-    y: 6/10,
-};
-const PAUSE_MENU_Y_OFFSET = 1/100;
-
-/** POSITIONING **/
-
-const PLAYER_OFFSETS = {
-    x: 1/2,
-    y: 9/10,
-};
-const BOSS_OFFSETS = {
-    x: 1/2,
-    y: 1/10,
-};
-const BOSS_LIMITS = {
-    x_min: 0,
-    x_max: 1,
-    y_min: 0,
-    y_max: 0.42,
-};
-
-/** FOLDER STRUCTURE **/
-
-const ASSET_PATH = 'assets';
-const MENU_ASSETS_FOLDER = 'menu';
-const PLAYER_JSON_PATH = 'player';
-const LEVEL_JSON_PATH = 'levels';
-
-/** PLAYER INFORMATION (SAME BETWEEN ALL PLAYERS) **/
-
-const INVIS_FRAMES_AFTER_HIT = 60;
-
-export {
-    BOOT_1_SCENE_KEY,
-    BOOT_2_SCENE_KEY,
-    FIGHT_SCENE_KEY,
-    PAUSE_SCENE_KEY,
-    KEY_TRACKER_KEY,
-    KEY_BINDINGS,
-    PLAYER_OFFSETS,
-    BOSS_OFFSETS,
-    BOSS_LIMITS,
-    ASSET_PATH,
-    MENU_ASSETS_FOLDER,
-    BACKGROUND_ALPHA,
-    DEFAULT_SCROLL_SPEED,
-    PAUSE_INPUT_DEBOUNCE_INITIAL_MS,
-    PAUSE_INPUT_DEBOUNCE_QUICK_MS,
-    PAUSE_OVERLAY_ALPHA,
-    PAUSE_MENU_UPPER_LEFT,
-    PAUSE_MENU_Y_OFFSET,
-    PLAYER_JSON_PATH,
-    LEVEL_JSON_PATH,
-    INVIS_FRAMES_AFTER_HIT,
-}
+export default GLOBALS;

@@ -1,4 +1,7 @@
-import {
+import GLOBALS from "../Globals";
+import {getPositionFromPercentages} from "../SpriteHelpers";
+
+const {
     FIGHT_SCENE_KEY,
     PAUSE_SCENE_KEY,
     ASSET_PATH,
@@ -8,8 +11,7 @@ import {
     PAUSE_OVERLAY_ALPHA,
     PAUSE_MENU_UPPER_LEFT,
     PAUSE_MENU_Y_OFFSET,
-} from "../Globals";
-import {getPositionFromPercentages} from "../SpriteHelpers";
+} = GLOBALS;
 
 const image_names = {
     continue: {

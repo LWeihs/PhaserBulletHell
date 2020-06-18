@@ -1,6 +1,8 @@
-import {
-    ASSET_PATH
-} from "./Globals";
+import GLOBALS from "./Globals";
+
+const {
+    ASSET_PATH,
+} = GLOBALS;
 
 /*---------------------------------------------------------------------------*/
 

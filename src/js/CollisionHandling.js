@@ -1,8 +1,8 @@
-function handleHitPlayer(game, player) {
+function handleHitPlayer(game, player, game_state) {
     if (player.isInvincible()) {
         return;
     }
-    player.addToLives(-1);
+    game_state.addToLives(-1);
     player.triggerInvincibility(game);
 }
 

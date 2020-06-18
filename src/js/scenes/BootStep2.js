@@ -1,8 +1,10 @@
-import {
+import GLOBALS from "../Globals";
+
+const {
     BOOT_2_SCENE_KEY,
     FIGHT_SCENE_KEY,
     LEVEL_JSON_PATH,
-} from "../Globals";
+} = GLOBALS;
 
 export default class BootStep2 extends Phaser.Scene {
     constructor() {

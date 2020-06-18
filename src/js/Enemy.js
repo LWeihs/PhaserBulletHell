@@ -1,15 +1,16 @@
-import {
-    BOSS_LIMITS,
-    BOSS_OFFSETS
-} from "./Globals";
+import GLOBALS from "./Globals";
 import EnemyEventTracker from "./EnemyEventTracker";
 import {createRoutine} from "./JSONTranslation";
 import {createMultipleShotSprites} from "./Shot";
 import {
-    checkSpriteXMovementPossible,
-    checkSpriteYMovementPossible,
+    moveSpriteWithinLimits,
     getPositionFromPercentages,
 } from "./SpriteHelpers";
+
+const {
+    BOSS_LIMITS,
+    BOSS_OFFSETS
+} = GLOBALS;
 
 export default class Enemy {
     constructor(game, {type, id: sprite_id, routines}, sprite_group) {
@@ -118,20 +119,25 @@ export default class Enemy {
 
         //ensure that random movements do stay within enemy's limits
         if (!can_leave) {
+            const {
+                x: x_move_possible,
+                y: y_move_possible,
+            } = moveSpriteWithinLimits(
+                this.sprite,
+                this.limits,
+                {
+                    distFromVelocities: true,
+                },
+            );
+
             //control x-movement
-            const {possible: x_move_possible, rem: x_rem} =
-                checkSpriteXMovementPossible(this.sprite, this.limits);
             if (!x_move_possible) {
                 this.event_tracker.disableOngoingXMovement();
-                this.sprite.x += x_rem;
                 x_velo = 0;
             }
             //control y-movement
-            const {possible: y_move_possible, rem: y_rem} =
-                checkSpriteYMovementPossible(this.sprite, this.limits);
             if (!y_move_possible) {
                 this.event_tracker.disableOngoingYMovement();
-                this.sprite.y += y_rem;
                 y_velo = 0;
             }
         }

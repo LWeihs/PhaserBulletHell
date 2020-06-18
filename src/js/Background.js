@@ -1,5 +1,9 @@
-import {BACKGROUND_ALPHA} from "./Globals";
+import GLOBALS from "./Globals";
 import {makeAssetPath} from "./ProjectHelpers";
+
+const {
+    BACKGROUND_ALPHA,
+} = GLOBALS;
 
 /**
  * Based on level info JSON.

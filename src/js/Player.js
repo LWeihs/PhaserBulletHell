@@ -1,11 +1,13 @@
-import {
-    PLAYER_OFFSETS
-} from "./Globals";
+import GLOBALS from "./Globals";
 import {createMultipleShotSprites} from "./Shot";
 import {getPositionFromPercentages} from "./SpriteHelpers";
 
+const {
+    PLAYER_OFFSETS,
+} = GLOBALS;
+
 export default class Player {
-    constructor({asset_folder, weapon, movement, invincibility_window, lives}) {
+    constructor({asset_folder, weapon, movement, invincibility_window}) {
         //inferred properties
         this.asset_folder = asset_folder;
         this.weapon = {
@@ -18,9 +20,14 @@ export default class Player {
             max: invincibility_window,
             active: false,
         };
-        this.cur_lives = lives;
         //properties to fill
         this.sprite = null;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    getSprite() {
+        return this.sprite;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -93,12 +100,6 @@ export default class Player {
                 this.weapon.cooldown--;
             }
         }
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    addToLives(addend) {
-        this.cur_lives += addend;
     }
 
     /*---------------------------------------------------------------------------*/

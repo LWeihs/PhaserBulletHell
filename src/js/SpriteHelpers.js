@@ -1,9 +1,47 @@
-function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
+function moveSpriteWithinLimits(sprite, limits, {distances, distFromVelocities, performMovement}) {
+    //log if further movement in this direction is possible
+    const res = {
+        x: true,
+        y: true,
+    };
+
+    //infer distances from velocities if so desired
+    if (distFromVelocities) {
+        distances = {
+            x: getSpriteDxPerFrame(sprite),
+            y: getSpriteDyPerFrame(sprite),
+        };
+    }
+
+    //control x-movement
+    const {possible: x_move_possible, rem: x_rem} =
+        checkSpriteXMovementPossible(sprite, limits, distances.x);
+    if (!x_move_possible) {
+        sprite.x += x_rem;
+        res.x = false;
+    } else if (performMovement) { //x-move possible
+        sprite.x += distances.x;
+    }
+    //control y-movement
+    const {possible: y_move_possible, rem: y_rem} =
+        checkSpriteYMovementPossible(sprite, limits, distances.y);
+    if (!y_move_possible) {
+        sprite.y += y_rem;
+        res.y = false;
+    } else if (performMovement) {
+        sprite.y += distances.y;
+    }
+
+    return res;
+}
+
+/*---------------------------------------------------------------------------*/
+
+function checkSpriteXMovementPossible(sprite, {x_min, x_max}, dx) {
     const res = {
         possible: true,
         rem: undefined, //remaining available move space
     };
-    const dx = getSpriteDxPerFrame(sprite);
     if (dx < 0) {
         res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
         if (dx < res.rem) {
@@ -20,12 +58,11 @@ function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
 
 /*---------------------------------------------------------------------------*/
 
-function checkSpriteYMovementPossible(sprite, {y_min, y_max}) {
+function checkSpriteYMovementPossible(sprite, {y_min, y_max}, dy) {
     const res = {
         possible: true,
         rem: undefined, //remaining available move space
     };
-    const dy = getSpriteDyPerFrame(sprite);
     if (dy < 0) {
         res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
         if (dy < res.rem) {
@@ -89,7 +126,6 @@ function getPositionFromPercentages({x: percentage_x, y: percentage_y},
 /*---------------------------------------------------------------------------*/
 
 export {
-    checkSpriteXMovementPossible,
-    checkSpriteYMovementPossible,
+    moveSpriteWithinLimits,
     getPositionFromPercentages,
 }

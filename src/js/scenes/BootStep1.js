@@ -1,12 +1,14 @@
-import {
+import GLOBALS from "../Globals";
+import KeyTracker from "../KeyTracker";
+
+const {
     BOOT_1_SCENE_KEY,
     BOOT_2_SCENE_KEY,
     KEY_TRACKER_KEY,
     PLAYER_JSON_PATH,
     KEY_BINDINGS,
     LEVEL_JSON_PATH,
-} from "../Globals";
-import KeyTracker from "../KeyTracker";
+} = GLOBALS;
 
 export default class BootStep1 extends Phaser.Scene
 {

@@ -3,67 +3,171 @@
     factory();
 }((function () { 'use strict';
 
-    /** SCENE KEYS **/
+    const GLOBALS = {
+        /** SCENE KEYS **/
+        BOOT_1_SCENE_KEY: 'boot1',
+        BOOT_2_SCENE_KEY: 'boot2',
+        FIGHT_SCENE_KEY: 'fight',
+        PAUSE_SCENE_KEY: 'pause',
+        KEY_TRACKER_KEY: 'key_tracker',
 
-    const BOOT_1_SCENE_KEY = 'boot1';
-    const BOOT_2_SCENE_KEY = 'boot2';
-    const FIGHT_SCENE_KEY = 'fight';
-    const PAUSE_SCENE_KEY = 'pause';
-    const KEY_TRACKER_KEY = 'key_tracker';
+        /** KEY BINDINGS **/
+        KEY_BINDINGS: {
+            //player movement
+            UP: {type: 'cursor', key: 'up'},
+            DOWN: {type: 'cursor', key: 'down'},
+            LEFT: {type: 'cursor', key: 'left'},
+            RIGHT: {type: 'cursor', key: 'right'},
+            //player actions
+            SLOW: {type: 'cursor', key: 'shift'},
+            FIRE: {type: 'keyboard', key: 'Y'},
+            SPECIAL: {type: 'keyboard', key: 'X'},
+            //general
+            PAUSE: {type: 'keyboard', key: 'ESC'},
+            ENTER: {type: 'keyboard', key: 'ENTER'},
+        },
 
-    /** KEY BINDINGS **/
+        /** BACKGROUNDS **/
 
-    const KEY_BINDINGS = {
-        //player movement
-        UP: {type: 'cursor', key: 'up'},
-        DOWN: {type: 'cursor', key: 'down'},
-        LEFT: {type: 'cursor', key: 'left'},
-        RIGHT: {type: 'cursor', key: 'right'},
-        SLOW: {type: 'cursor', key: 'shift'},
-        FIRE: {type: 'keyboard', key: 'Y'},
-        //general
-        PAUSE: {type: 'keyboard', key: 'ESC'},
-        ENTER: {type: 'keyboard', key: 'ENTER'},
+        BACKGROUND_ALPHA: 0.5,
+
+        /** PAUSE MENU **/
+
+        PAUSE_INPUT_DEBOUNCE_INITIAL_MS: 500,
+        PAUSE_INPUT_DEBOUNCE_QUICK_MS: 250,
+        PAUSE_OVERLAY_ALPHA: 0.94,
+        PAUSE_MENU_UPPER_LEFT: {
+            x: 1 / 20,
+            y: 6 / 10,
+        },
+        PAUSE_MENU_Y_OFFSET: 1 / 100,
+
+        /** POSITIONING **/
+
+        PLAYER_OFFSETS: {
+            x: 1 / 2,
+            y: 9 / 10,
+        },
+        BOSS_OFFSETS: {
+            x: 1 / 2,
+            y: 1 / 10,
+        },
+        BOSS_LIMITS: {
+            x_min: 0,
+            x_max: 1,
+            y_min: 0,
+            y_max: 0.42,
+        },
+
+        /** FOLDER STRUCTURE **/
+
+        ASSET_PATH: 'assets',
+        MENU_ASSETS_FOLDER: 'menu',
+        PLAYER_JSON_PATH: 'player',
+        LEVEL_JSON_PATH: 'levels',
+
+        /** PLAYER INFORMATION (SAME BETWEEN ALL PLAYERS) **/
+
+        INVIS_FRAMES_AFTER_HIT: 60,
+        ENERGY_PASSIVE_ACCUMULATION: 2,
+        ENERGY_ACCUMULATION_INTERVAL: 100, //ms
+
+        /** PLAYER SPECIALS **/
+
+        PLAYER_BLINK_DISTANCE: 100,
+
+        /** GAME STATE INFORMATION **/
+
+        PLAYER_MAX_LIVES: 99,
+
+        /** UI **/
+        ENERGY_METER: {
+            MIDPOINT_OFFSETS: {
+                x: 1 / 2,
+                y: 29 / 30,
+            },
+            WIDTH: 400,
+            HEIGHT: 20,
+            BG_COLOR: 0xffcccc,
+            FILL_COLOR: 0x29a329,
+            BORDER_WIDTH: 4,
+        },
     };
 
-    /** BACKGROUNDS **/
+    const {
+        PLAYER_MAX_LIVES,
+    } = GLOBALS;
 
-    const BACKGROUND_ALPHA = 0.5;
+    class GameState {
+        constructor(state_info) {
+            this.switchToState(state_info);
+        }
 
-    /** PAUSE MENU **/
+        /*---------------------------------------------------------------------------*/
 
-    const PAUSE_INPUT_DEBOUNCE_INITIAL_MS = 500;
-    const PAUSE_INPUT_DEBOUNCE_QUICK_MS = 250;
-    const PAUSE_OVERLAY_ALPHA = 0.94;
-    const PAUSE_MENU_UPPER_LEFT = {
-        x: 1/20,
-        y: 6/10,
-    };
-    const PAUSE_MENU_Y_OFFSET = 1/100;
+        switchToState({lives, special}) {
+            //live management
+            if (lives) {
+                this.cur_lives = lives;
+            }
+            if (special) {
+                special.energy = 0; //also has "name" and "energy_required" fields
+                this.special = special;
+            }
+        }
 
-    /** POSITIONING **/
+        /*---------------------------------------------------------------------------*/
 
-    const PLAYER_OFFSETS = {
-        x: 1/2,
-        y: 9/10,
-    };
-    const BOSS_OFFSETS = {
-        x: 1/2,
-        y: 1/10,
-    };
-    const BOSS_LIMITS = {
-        x_min: 0,
-        x_max: 1,
-        y_min: 0,
-        y_max: 0.42,
-    };
+        getSpecialName() {
+            return this.special.name;
+        }
 
-    /** FOLDER STRUCTURE **/
+        /*---------------------------------------------------------------------------*/
 
-    const ASSET_PATH = 'assets';
-    const MENU_ASSETS_FOLDER = 'menu';
-    const PLAYER_JSON_PATH = 'player';
-    const LEVEL_JSON_PATH = 'levels';
+        addToLives(addend) {
+            this.cur_lives += addend;
+            if (this.cur_lives > PLAYER_MAX_LIVES) {
+                this.cur_lives = PLAYER_MAX_LIVES;
+            } else if (this.cur_lives < 0) {
+                this.cur_lives = 0;
+            }
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        addEnergy(addend) {
+            this.special.energy += addend;
+            if (this.special.energy > this.special.energy_required) {
+                this.special.energy = this.special.energy_required;
+            } else if (this.special.energy < 0) {
+                this.special.energy = 0;
+            }
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        isSpecialReady() {
+            return this.special.energy === this.special.energy_required;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getEnergyPercentage() {
+            return this.special.energy / this.special.energy_required;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        clearEnergy() {
+            this.special.energy = 0;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        isGameOver() {
+            return this.cur_lives <= 0;
+        }
+    }
 
     function divideDistXAndY(dist, angle, isRadian = true) {
         angle = isRadian ? angle : degreeToRadian(angle);
@@ -77,6 +181,224 @@
 
     function degreeToRadian(degree) {
         return degree * Math.PI/180;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getRectBorders({x, y, width, height}) {
+        return {
+            x_min: x,
+            x_max: x + width,
+            y_min: y,
+            y_max: y + height,
+        }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getRectBordersFromMidpoint(midpoint, width, height) {
+        return {
+            x_min: midpoint.x - width/2,
+            x_max: midpoint.x + width/2,
+            y_min: midpoint.y - height/2,
+            y_max: midpoint.y + height/2,
+        }
+    }
+
+    class PercentageBar {
+        constructor(game, midpoint, width, height, border_width, bg_color, fill_color) {
+            //the Object to render with
+            this.bar = game.add.graphics();
+
+            //describe the parts of the health bar
+            const {x_min, y_min} = getRectBordersFromMidpoint(midpoint, width, height);
+            this.outer_rect = {
+                x: x_min,
+                y: y_min,
+                width: width,
+                height: height,
+            };
+            this.inner_rect = { //the rect to show the meter in percent
+                x: x_min + border_width,
+                y: y_min + border_width,
+                width: width - border_width*2,
+                height: height - border_width*2,
+            };
+
+            //cache the colors to use for the outer/inner rect
+            this.bg_color = bg_color;
+            this.fill_color = fill_color;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        draw(percentage) {
+            this.bar.clear();
+
+            //draw outer rectangle
+            this.bar.fillStyle(this.bg_color);
+            this.bar.fillRect(this.outer_rect.x, this.outer_rect.y, this.outer_rect.width,
+                this.outer_rect.height);
+
+            //draw inner rectangle based on given percentage
+            this.bar.fillStyle(this.fill_color);
+            const fill_width = this.inner_rect.width * percentage;
+            this.bar.fillRect(this.inner_rect.x, this.inner_rect.y, fill_width,
+                this.inner_rect.height);
+        }
+    }
+
+    function moveSpriteWithinLimits(sprite, limits, {distances, distFromVelocities, performMovement}) {
+        //log if further movement in this direction is possible
+        const res = {
+            x: true,
+            y: true,
+        };
+
+        //infer distances from velocities if so desired
+        if (distFromVelocities) {
+            distances = {
+                x: getSpriteDxPerFrame(sprite),
+                y: getSpriteDyPerFrame(sprite),
+            };
+        }
+
+        //control x-movement
+        const {possible: x_move_possible, rem: x_rem} =
+            checkSpriteXMovementPossible(sprite, limits, distances.x);
+        if (!x_move_possible) {
+            sprite.x += x_rem;
+            res.x = false;
+        } else if (performMovement) { //x-move possible
+            sprite.x += distances.x;
+        }
+        //control y-movement
+        const {possible: y_move_possible, rem: y_rem} =
+            checkSpriteYMovementPossible(sprite, limits, distances.y);
+        if (!y_move_possible) {
+            sprite.y += y_rem;
+            res.y = false;
+        } else if (performMovement) {
+            sprite.y += distances.y;
+        }
+
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function checkSpriteXMovementPossible(sprite, {x_min, x_max}, dx) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        if (dx < 0) {
+            res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
+            if (dx < res.rem) {
+                res.possible = false;
+            }
+        } else if (dx > 0) {
+            res.rem = calcDistanceSpriteToLimitRight(sprite, x_max);
+            if (dx > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function checkSpriteYMovementPossible(sprite, {y_min, y_max}, dy) {
+        const res = {
+            possible: true,
+            rem: undefined, //remaining available move space
+        };
+        if (dy < 0) {
+            res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
+            if (dy < res.rem) {
+                res.possible = false;
+            }
+        } else if (dy > 0) {
+            res.rem = calcDistanceSpriteToLimitDown(sprite, y_max);
+            if (dy > res.rem) {
+                res.possible = false;
+            }
+        }
+        return res;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitLeft(sprite, x_min) {
+        return sprite.x - sprite.body.halfWidth - x_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitRight(sprite, x_max) {
+        return x_max - (sprite.x + sprite.body.halfWidth);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitUp(sprite, y_min) {
+        return sprite.y - sprite.body.halfHeight - y_min;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function calcDistanceSpriteToLimitDown(sprite, y_max) {
+        return y_max - (sprite.y + sprite.body.halfHeight);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDxPerFrame(sprite) {
+        return sprite.body._dx;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getSpriteDyPerFrame(sprite) {
+        return sprite.body._dy;
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function getPositionFromPercentages({x: percentage_x, y: percentage_y},
+                                        {width: scene_width, height: scene_height}) {
+        return {
+            x: percentage_x * scene_width,
+            y: percentage_y * scene_height,
+        };
+    }
+
+    const {
+        ENERGY_METER,
+    } = GLOBALS;
+
+    class UI {
+        constructor(game) {
+            //create energy meter
+            const {x: midpoint_x, y: midpoint_y} =
+                getPositionFromPercentages(ENERGY_METER.MIDPOINT_OFFSETS, game.scale);
+            this.energy_meter = new PercentageBar(game,
+                {x: midpoint_x, y: midpoint_y},
+                ENERGY_METER.WIDTH,
+                ENERGY_METER.HEIGHT,
+                ENERGY_METER.BORDER_WIDTH,
+                ENERGY_METER.BG_COLOR,
+                ENERGY_METER.FILL_COLOR,
+            );
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        syncWithGameState(game_state) {
+            //sync energy with energy meter
+            const energy_percentage = game_state.getEnergyPercentage();
+            this.energy_meter.draw(energy_percentage);
+        }
     }
 
     function createMultipleShotSprites(game, shot_infos, reference, shot_group) {
@@ -148,96 +470,12 @@
         shot.setVelocityY(y_velo);
     }
 
-    function checkSpriteXMovementPossible(sprite, {x_min, x_max}) {
-        const res = {
-            possible: true,
-            rem: undefined, //remaining available move space
-        };
-        const dx = getSpriteDxPerFrame(sprite);
-        if (dx < 0) {
-            res.rem = -calcDistanceSpriteToLimitLeft(sprite, x_min);
-            if (dx < res.rem) {
-                res.possible = false;
-            }
-        } else if (dx > 0) {
-            res.rem = calcDistanceSpriteToLimitRight(sprite, x_max);
-            if (dx > res.rem) {
-                res.possible = false;
-            }
-        }
-        return res;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function checkSpriteYMovementPossible(sprite, {y_min, y_max}) {
-        const res = {
-            possible: true,
-            rem: undefined, //remaining available move space
-        };
-        const dy = getSpriteDyPerFrame(sprite);
-        if (dy < 0) {
-            res.rem = -calcDistanceSpriteToLimitUp(sprite, y_min);
-            if (dy < res.rem) {
-                res.possible = false;
-            }
-        } else if (dy > 0) {
-            res.rem = calcDistanceSpriteToLimitDown(sprite, y_max);
-            if (dy > res.rem) {
-                res.possible = false;
-            }
-        }
-        return res;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitLeft(sprite, x_min) {
-        return sprite.x - sprite.body.halfWidth - x_min;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitRight(sprite, x_max) {
-        return x_max - (sprite.x + sprite.body.halfWidth);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitUp(sprite, y_min) {
-        return sprite.y - sprite.body.halfHeight - y_min;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function calcDistanceSpriteToLimitDown(sprite, y_max) {
-        return y_max - (sprite.y + sprite.body.halfHeight);
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getSpriteDxPerFrame(sprite) {
-        return sprite.body._dx;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getSpriteDyPerFrame(sprite) {
-        return sprite.body._dy;
-    }
-
-    /*---------------------------------------------------------------------------*/
-
-    function getPositionFromPercentages({x: percentage_x, y: percentage_y},
-                                        {width: scene_width, height: scene_height}) {
-        return {
-            x: percentage_x * scene_width,
-            y: percentage_y * scene_height,
-        };
-    }
+    const {
+        PLAYER_OFFSETS,
+    } = GLOBALS;
 
     class Player {
-        constructor({asset_folder, weapon, movement, invincibility_window, lives}) {
+        constructor({asset_folder, weapon, movement, invincibility_window}) {
             //inferred properties
             this.asset_folder = asset_folder;
             this.weapon = {
@@ -250,9 +488,14 @@
                 max: invincibility_window,
                 active: false,
             };
-            this.cur_lives = lives;
             //properties to fill
             this.sprite = null;
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getSprite() {
+            return this.sprite;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -325,12 +568,6 @@
                     this.weapon.cooldown--;
                 }
             }
-        }
-
-        /*---------------------------------------------------------------------------*/
-
-        addToLives(addend) {
-            this.cur_lives += addend;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -841,6 +1078,11 @@
         return routine;
     }
 
+    const {
+        BOSS_LIMITS,
+        BOSS_OFFSETS
+    } = GLOBALS;
+
     class Enemy {
         constructor(game, {type, id: sprite_id, routines}, sprite_group) {
             this._createEventTracker(game, routines); //sets this.event_tracker
@@ -948,20 +1190,25 @@
 
             //ensure that random movements do stay within enemy's limits
             if (!can_leave) {
+                const {
+                    x: x_move_possible,
+                    y: y_move_possible,
+                } = moveSpriteWithinLimits(
+                    this.sprite,
+                    this.limits,
+                    {
+                        distFromVelocities: true,
+                    },
+                );
+
                 //control x-movement
-                const {possible: x_move_possible, rem: x_rem} =
-                    checkSpriteXMovementPossible(this.sprite, this.limits);
                 if (!x_move_possible) {
                     this.event_tracker.disableOngoingXMovement();
-                    this.sprite.x += x_rem;
                     x_velo = 0;
                 }
                 //control y-movement
-                const {possible: y_move_possible, rem: y_rem} =
-                    checkSpriteYMovementPossible(this.sprite, this.limits);
                 if (!y_move_possible) {
                     this.event_tracker.disableOngoingYMovement();
-                    this.sprite.y += y_rem;
                     y_velo = 0;
                 }
             }
@@ -984,11 +1231,19 @@
         }
     }
 
+    const {
+        ASSET_PATH,
+    } = GLOBALS;
+
     /*---------------------------------------------------------------------------*/
 
     function makeAssetPath(suffix) {
         return `${ASSET_PATH}/${suffix}`;
     }
+
+    const {
+        BACKGROUND_ALPHA,
+    } = GLOBALS;
 
     /**
      * Based on level info JSON.
@@ -1049,11 +1304,11 @@
         }
     }
 
-    function handleHitPlayer(game, player) {
+    function handleHitPlayer(game, player, game_state) {
         if (player.isInvincible()) {
             return;
         }
-        player.addToLives(-1);
+        game_state.addToLives(-1);
         player.triggerInvincibility(game);
     }
 
@@ -1062,6 +1317,97 @@
     function handleEnemyHit(bullet) {
         bullet.destroy();
     }
+
+    const {
+        PLAYER_BLINK_DISTANCE,
+    } = GLOBALS;
+
+    function handlePlayerSpecial(active_keys, game_state, game_limits, player) {
+        //check if special can be executed
+        if (!game_state.isSpecialReady()) {
+            return;
+        }
+        const {SPECIAL: special_key_active} = active_keys;
+        if (!special_key_active) {
+            return;
+        }
+        //perform the special
+        executeSpecialByName(game_state.getSpecialName(), game_limits, active_keys, player);
+        //reset the game state
+        game_state.clearEnergy();
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function executeSpecialByName(special_name, game_limits, active_keys, player) {
+        switch (special_name) {
+            case 'blink':
+                executeBlink(active_keys, game_limits, player);
+                break;
+        }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    function executeBlink(active_keys, game_limits, player) {
+        const {
+            UP: up_active,
+            DOWN: down_active,
+            LEFT: left_active,
+            RIGHT: right_active,
+        } = active_keys;
+
+        const blink_dir = {
+            up: up_active && !down_active,
+            down: down_active && !up_active,
+            left: left_active && !right_active,
+            right: right_active && !left_active,
+        };
+
+        //find blink degree based on direction of player movement
+        let degree;
+        if (blink_dir.up) {
+            if (blink_dir.left) {
+                degree = 225;
+            } else if (blink_dir.right) {
+                degree = 135;
+            } else {
+                degree = 180;
+            }
+        } else if (blink_dir.down) {
+            if (blink_dir.left) {
+                degree = 315;
+            } else if (blink_dir.right) {
+                degree = 45;
+            } else {
+                degree = 0;
+            }
+        } else if (blink_dir.left) { //neither up or down
+            degree = 270;
+        } else if (blink_dir.right) { //neither up or down
+            degree = 90;
+        } else { //no keys active
+            degree = 180;
+        }
+
+        //find distances to cover with blink
+        const blink_distances =
+            divideDistXAndY(PLAYER_BLINK_DISTANCE, degree, false);
+        //execute blink
+        const opts = {
+            distances: blink_distances,
+            performMovement: true,
+            distFromVelocities: false,
+        };
+        moveSpriteWithinLimits(player.getSprite(), game_limits, opts);
+    }
+
+    const {
+        FIGHT_SCENE_KEY,
+        PAUSE_SCENE_KEY,
+        ENERGY_ACCUMULATION_INTERVAL,
+        ENERGY_PASSIVE_ACCUMULATION,
+    } = GLOBALS;
 
     //level progression
     let timer = 0;
@@ -1077,13 +1423,34 @@
         /*---------------------------------------------------------------------------*/
 
         init(global_data) {
+            //limits of game area in which elements may move
+            this.limits = getRectBorders({
+                x: 0,
+                y: 0,
+                width: this.scale.width,
+                height: this.scale.height,
+            });
+
+            //get relevant JSON data
+            const level_base_info = this.cache.json.get('level_base_info');
+            const player_info = this.cache.json.get('player_info');
+
+            //global data carried between scenes
             this.GLOBAL = global_data;
 
-            this.player = new Player(this.cache.json.get('player_info'));
+            //game state to track lives, energy meter
+            this.game_state = new GameState(player_info);
 
-            const level_base_info = this.cache.json.get('level_base_info');
+            //UI to signal game state to player
+            this.UI = new UI(this);
+
+            //management of the player sprite
+            this.player = new Player(player_info);
+
+            //management of the (parallax) background
             this.background = new Background(level_base_info.background);
 
+            //management of currently active enemy sprites/routines
             this.active_enemies = [];
         }
 
@@ -1145,12 +1512,15 @@
             //background
             this.background.create(this);
 
+            //UI
+            this.UI.syncWithGameState(this.game_state);
+
             //player setup
             const player_sprite = this.player.create(this);
 
             //player collision handling
             const player_hit = () => {
-                handleHitPlayer(this, this.player);
+                handleHitPlayer(this, this.player, this.game_state);
             };
             this.physics.add.overlap(player_sprite, this.deadly_enemies, player_hit);
             this.physics.add.overlap(player_sprite, this.enemy_bullets, player_hit);
@@ -1158,6 +1528,26 @@
             //enemy collision handling
             this.physics.add.overlap(this.player_bullets, this.deadly_enemies,
                 handleEnemyHit);
+
+            //start repeating timers
+            this._startRepeatingTimer(ENERGY_ACCUMULATION_INTERVAL, () => {
+                this.game_state.addEnergy(ENERGY_PASSIVE_ACCUMULATION);
+            });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _startRepeatingTimer(delay, callback) {
+            const start_timer = () => {
+                this.time.addEvent({
+                    delay: delay,
+                    callback: () => {
+                        callback();
+                        start_timer();
+                    },
+                });
+            };
+            start_timer();
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1168,11 +1558,18 @@
 
             //divide update step into sub-steps of game elements
 
+            //get necessary variables
+            const active_keys = this.GLOBAL.KEY_TRACKER.active_keys;
+
             //background
             this.background.update();
 
+            //UI
+            this.UI.syncWithGameState(this.game_state);
+
             //player
-            this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys, this.player_bullets);
+            this.player.update(this, active_keys, this.player_bullets);
+            handlePlayerSpecial(active_keys, this.game_state, this.limits, this.player);
 
             //enemies by timeline
             this.createNewEnemies();
@@ -1254,10 +1651,12 @@
         DOWN: false,
         LEFT: false,
         RIGHT: false,
-        //player fire bullets/accept prompts
-        FIRE: false,
         //player slow down
         SLOW: false,
+        //player fire bullets/accept prompts
+        FIRE: false,
+        //player special action
+        SPECIAL: false,
         //player input to pause/unpause game
         PAUSE: false,
         //enter key to accept prompts
@@ -1360,6 +1759,15 @@
         }
     }
 
+    const {
+        BOOT_1_SCENE_KEY,
+        BOOT_2_SCENE_KEY,
+        KEY_TRACKER_KEY,
+        PLAYER_JSON_PATH,
+        KEY_BINDINGS,
+        LEVEL_JSON_PATH,
+    } = GLOBALS;
+
     class BootStep1 extends Phaser.Scene
     {
         constructor() {
@@ -1412,9 +1820,15 @@
         }
     }
 
+    const {
+        BOOT_2_SCENE_KEY: BOOT_2_SCENE_KEY$1,
+        FIGHT_SCENE_KEY: FIGHT_SCENE_KEY$1,
+        LEVEL_JSON_PATH: LEVEL_JSON_PATH$1,
+    } = GLOBALS;
+
     class BootStep2 extends Phaser.Scene {
         constructor() {
-            super({key: BOOT_2_SCENE_KEY});
+            super({key: BOOT_2_SCENE_KEY$1});
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1430,16 +1844,28 @@
 
             //load the json referenced in the levels json_keys file
             Object.entries(this.cache.json.get('level_json_keys')).forEach(([key, path]) => {
-                this.load.json(key, `${LEVEL_JSON_PATH}/${level_id}/${path}`);
+                this.load.json(key, `${LEVEL_JSON_PATH$1}/${level_id}/${path}`);
             });
         }
 
         /*---------------------------------------------------------------------------*/
 
         create() {
-            this.scene.start(FIGHT_SCENE_KEY, this.GLOBAL);
+            this.scene.start(FIGHT_SCENE_KEY$1, this.GLOBAL);
         }
     }
+
+    const {
+        FIGHT_SCENE_KEY: FIGHT_SCENE_KEY$2,
+        PAUSE_SCENE_KEY: PAUSE_SCENE_KEY$1,
+        ASSET_PATH: ASSET_PATH$1,
+        MENU_ASSETS_FOLDER,
+        PAUSE_INPUT_DEBOUNCE_INITIAL_MS,
+        PAUSE_INPUT_DEBOUNCE_QUICK_MS,
+        PAUSE_OVERLAY_ALPHA,
+        PAUSE_MENU_UPPER_LEFT,
+        PAUSE_MENU_Y_OFFSET,
+    } = GLOBALS;
 
     const image_names = {
         continue: {
@@ -1460,7 +1886,7 @@
     class PauseScene extends Phaser.Scene {
         constructor() {
             super({
-                key: PAUSE_SCENE_KEY,
+                key: PAUSE_SCENE_KEY$1,
             });
         }
 
@@ -1525,7 +1951,7 @@
         /*---------------------------------------------------------------------------*/
 
         makeAssetPath(suffix) {
-            return `${ASSET_PATH}/${MENU_ASSETS_FOLDER}/${suffix}`;
+            return `${ASSET_PATH$1}/${MENU_ASSETS_FOLDER}/${suffix}`;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1777,14 +2203,18 @@
             this.GLOBAL.KEY_TRACKER.removeAllBlocks();
             //let phaser switch back to fight scene
             this.scene.sleep();
-            this.scene.resume(FIGHT_SCENE_KEY);
+            this.scene.resume(FIGHT_SCENE_KEY$2);
         }
     }
+
+    const {
+        KEY_TRACKER_KEY: KEY_TRACKER_KEY$1
+    } = GLOBALS;
 
     class BackgroundKeyTracking extends Phaser.Scene {
         constructor() {
             super({
-                key: KEY_TRACKER_KEY,
+                key: KEY_TRACKER_KEY$1,
             });
         }
 
@@ -1800,45 +2230,47 @@
             this.cursors = this.input.keyboard.createCursorKeys();
 
             //bind keys according to key binding specification
-            const {UP, DOWN, LEFT, RIGHT, SLOW, FIRE, PAUSE, ENTER} = this.GLOBAL.KEY_BINDINGS;
+            const {UP, DOWN, LEFT, RIGHT, SLOW, FIRE, SPECIAL, PAUSE, ENTER} = this.GLOBAL.KEY_BINDINGS;
 
             //track player movement
-            this.up = this.createPhaserKey(UP);
-            this.down = this.createPhaserKey(DOWN);
-            this.left = this.createPhaserKey(LEFT);
-            this.right = this.createPhaserKey(RIGHT);
+            this.up = this._createPhaserKey(UP);
+            this.down = this._createPhaserKey(DOWN);
+            this.left = this._createPhaserKey(LEFT);
+            this.right = this._createPhaserKey(RIGHT);
             //track player slowdown
-            this.slow = this.createPhaserKey(SLOW);
+            this.slow = this._createPhaserKey(SLOW);
             //track player fire
-            this.firing = this.createPhaserKey(FIRE);
+            this.firing = this._createPhaserKey(FIRE);
+            //track player special
+            this.special = this._createPhaserKey(SPECIAL);
             //track player accepting prompts etc
-            this.enter = this.createPhaserKey(ENTER);
+            this.enter = this._createPhaserKey(ENTER);
 
             //scene pausing
-            this.pause = this.createPhaserKey(PAUSE);
+            this.pause = this._createPhaserKey(PAUSE);
             this.pause_pressed = false; //track continuous holding of pause key
         }
 
         /*---------------------------------------------------------------------------*/
 
-        createPhaserKey({type, key: key_bind}) {
+        _createPhaserKey({type, key: key_bind}) {
             switch (type) {
                 case 'cursor':
-                    return this.createPhaserCursorKey(key_bind);
+                    return this._createPhaserCursorKey(key_bind);
                 case 'keyboard':
-                    return this.createPhaserKeyboardKey(key_bind);
+                    return this._createPhaserKeyboardKey(key_bind);
             }
         }
 
         /*---------------------------------------------------------------------------*/
 
-        createPhaserCursorKey(key_bind) {
+        _createPhaserCursorKey(key_bind) {
             return this.cursors[key_bind];
         }
 
         /*---------------------------------------------------------------------------*/
 
-        createPhaserKeyboardKey(key_bind) {
+        _createPhaserKeyboardKey(key_bind) {
             return this.input.keyboard.addKey(
                 Phaser.Input.Keyboard.KeyCodes[key_bind]
             );
@@ -1848,33 +2280,35 @@
 
         update() {
             //update player movement
-            this.setGlobalKey('UP', this.up);
-            this.setGlobalKey('DOWN', this.down);
-            this.setGlobalKey('LEFT', this.left);
-            this.setGlobalKey('RIGHT', this.right);
+            this._setGlobalKey('UP', this.up);
+            this._setGlobalKey('DOWN', this.down);
+            this._setGlobalKey('LEFT', this.left);
+            this._setGlobalKey('RIGHT', this.right);
             //update player slowdown
-            this.setGlobalKey('SLOW', this.slow);
+            this._setGlobalKey('SLOW', this.slow);
             //update player fire
-            this.setGlobalKey('FIRE', this.firing);
+            this._setGlobalKey('FIRE', this.firing);
+            //mark that player wants to use his special action
+            this._setGlobalKey('SPECIAL', this.special);
             //mark that player wants to proceed through given prompt
-            this.setGlobalKey('ENTER', this.enter);
+            this._setGlobalKey('ENTER', this.enter);
 
             //mark if game should be paused/unpaused on next scene update step
-            this.updatePausePossibility('PAUSE', this.pause);
+            this._updatePausePossibility('PAUSE', this.pause);
         }
 
         /*---------------------------------------------------------------------------*/
 
-        setGlobalKey(key, phaser_key) {
-            const {pressed, active} = this.determineNextKeyState(key, phaser_key);
-            this.setKeyTrackerNextKeyState(key, pressed, active);
+        _setGlobalKey(key, phaser_key) {
+            const {pressed, active} = this._determineNextKeyState(key, phaser_key);
+            this._setKeyTrackerNextKeyState(key, pressed, active);
         }
 
         /*---------------------------------------------------------------------------*/
 
-        updatePausePossibility(key, phaser_key) {
+        _updatePausePossibility(key, phaser_key) {
             const {pressed, active: key_active_possible} =
-                this.determineNextKeyState(key, phaser_key);
+                this._determineNextKeyState(key, phaser_key);
             //pause key only counts as active on initial press
             let key_active = false;
             if (key_active_possible) {
@@ -1886,12 +2320,12 @@
                 this.pause_pressed = false;
             }
             //set new state
-            this.setKeyTrackerNextKeyState(key, pressed, key_active);
+            this._setKeyTrackerNextKeyState(key, pressed, key_active);
         }
 
         /*---------------------------------------------------------------------------*/
 
-        determineNextKeyState(key, phaser_key) {
+        _determineNextKeyState(key, phaser_key) {
             const pressed = phaser_key.isDown;
 
             //normally, pressed key is also seen as active
@@ -1909,7 +2343,7 @@
 
         /*---------------------------------------------------------------------------*/
 
-        setKeyTrackerNextKeyState(key, pressed, active) {
+        _setKeyTrackerNextKeyState(key, pressed, active) {
             const key_tracker = this.GLOBAL.KEY_TRACKER;
             key_tracker.setKeyPressed(key, pressed);
             key_tracker.setKeyActivity(key, active);
@@ -1931,7 +2365,7 @@
             autoCenter: Phaser.Scale.CENTER_BOTH,
         },
         scene: [
-            BootStep1, //load json files of level
+            BootStep1, //load JSON files of level
             BootStep2, //load referenced files from BootStep1
             BackgroundKeyTracking, //to track keyboard input over multiple scenes
             FightScene, //main game scene

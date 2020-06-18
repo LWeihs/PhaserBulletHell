@@ -1,15 +1,27 @@
-import {
-    FIGHT_SCENE_KEY,
-    PAUSE_SCENE_KEY,
-} from "../Globals";
+import GLOBALS from "../Globals";
+import GameState from "../GameState";
+import UI from "../UI/UI";
 import Player from "../Player";
 import Enemy from "../Enemy";
 import Background from "../Background";
-import {makeAssetPath} from "../ProjectHelpers";
+import {
+    makeAssetPath,
+} from "../ProjectHelpers";
 import {
     handleHitPlayer,
     handleEnemyHit,
 } from "../CollisionHandling";
+import handlePlayerSpecial from "../Specials";
+import {
+    getRectBorders,
+} from "../GeometryHelpers";
+
+const {
+    FIGHT_SCENE_KEY,
+    PAUSE_SCENE_KEY,
+    ENERGY_ACCUMULATION_INTERVAL,
+    ENERGY_PASSIVE_ACCUMULATION,
+} = GLOBALS;
 
 //level progression
 let timer = 0;
@@ -25,13 +37,34 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     init(global_data) {
+        //limits of game area in which elements may move
+        this.limits = getRectBorders({
+            x: 0,
+            y: 0,
+            width: this.scale.width,
+            height: this.scale.height,
+        });
+
+        //get relevant JSON data
+        const level_base_info = this.cache.json.get('level_base_info');
+        const player_info = this.cache.json.get('player_info');
+
+        //global data carried between scenes
         this.GLOBAL = global_data;
 
-        this.player = new Player(this.cache.json.get('player_info'));
+        //game state to track lives, energy meter
+        this.game_state = new GameState(player_info);
 
-        const level_base_info = this.cache.json.get('level_base_info');
+        //UI to signal game state to player
+        this.UI = new UI(this);
+
+        //management of the player sprite
+        this.player = new Player(player_info);
+
+        //management of the (parallax) background
         this.background = new Background(level_base_info.background);
 
+        //management of currently active enemy sprites/routines
         this.active_enemies = [];
     }
 
@@ -93,12 +126,15 @@ export default class FightScene extends Phaser.Scene {
         //background
         this.background.create(this);
 
+        //UI
+        this.UI.syncWithGameState(this.game_state);
+
         //player setup
         const player_sprite = this.player.create(this);
 
         //player collision handling
         const player_hit = () => {
-            handleHitPlayer(this, this.player);
+            handleHitPlayer(this, this.player, this.game_state);
         };
         this.physics.add.overlap(player_sprite, this.deadly_enemies, player_hit);
         this.physics.add.overlap(player_sprite, this.enemy_bullets, player_hit);
@@ -106,6 +142,26 @@ export default class FightScene extends Phaser.Scene {
         //enemy collision handling
         this.physics.add.overlap(this.player_bullets, this.deadly_enemies,
             handleEnemyHit);
+
+        //start repeating timers
+        this._startRepeatingTimer(ENERGY_ACCUMULATION_INTERVAL, () => {
+            this.game_state.addEnergy(ENERGY_PASSIVE_ACCUMULATION);
+        });
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    _startRepeatingTimer(delay, callback) {
+        const start_timer = () => {
+            this.time.addEvent({
+                delay: delay,
+                callback: () => {
+                    callback();
+                    start_timer();
+                },
+            });
+        };
+        start_timer();
     }
 
     /*---------------------------------------------------------------------------*/
@@ -116,11 +172,18 @@ export default class FightScene extends Phaser.Scene {
 
         //divide update step into sub-steps of game elements
 
+        //get necessary variables
+        const active_keys = this.GLOBAL.KEY_TRACKER.active_keys;
+
         //background
         this.background.update();
 
+        //UI
+        this.UI.syncWithGameState(this.game_state);
+
         //player
-        this.player.update(this, this.GLOBAL.KEY_TRACKER.active_keys, this.player_bullets);
+        this.player.update(this, active_keys, this.player_bullets);
+        handlePlayerSpecial(active_keys, this.game_state, this.limits, this.player);
 
         //enemies by timeline
         this.createNewEnemies();

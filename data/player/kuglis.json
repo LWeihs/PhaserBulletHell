@@ -17,5 +17,9 @@
     "slowed": 320
   },
   "invincibility_window": 2000,
-  "lives": 3
+  "lives": 3,
+  "special": {
+    "name": "blink",
+    "energy_required": 50
+  }
 }

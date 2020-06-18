@@ -19,7 +19,7 @@ const config = {
         autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [
-        BootStep1, //load json files of level
+        BootStep1, //load JSON files of level
         BootStep2, //load referenced files from BootStep1
         BackgroundKeyTracking, //to track keyboard input over multiple scenes
         FightScene, //main game scene
