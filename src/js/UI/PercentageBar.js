@@ -41,4 +41,10 @@ export default class PercentageBar {
         this.bar.fillRect(this.inner_rect.x, this.inner_rect.y, fill_width,
             this.inner_rect.height);
     }
+
+    /*---------------------------------------------------------------------------*/
+
+    hide() {
+        this.bar.clear();
+    }
 }

@@ -8,7 +8,8 @@
         "x_offset": 0,
         "y_offset": 0,
         "degree": 180,
-        "speed": 580
+        "speed": 580,
+        "damage": 5
       }
     ]
   },

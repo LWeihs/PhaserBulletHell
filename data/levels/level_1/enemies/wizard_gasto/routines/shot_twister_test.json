@@ -1,6 +1,6 @@
 {
   "name": "ShotTwisterTest",
-  "loops": false,
+  "loops": true,
   "hp": 300,
   "duration": 144,
 

@@ -74,7 +74,7 @@
 
         /** PLAYER SPECIALS **/
 
-        PLAYER_BLINK_DISTANCE: 100,
+        PLAYER_BLINK_DISTANCE: 300,
 
         /** GAME STATE INFORMATION **/
 
@@ -92,6 +92,18 @@
             FILL_COLOR: 0x29a329,
             BORDER_WIDTH: 4,
         },
+
+        BOSS_HEALTHBAR: {
+            MIDPOINT_OFFSETS: {
+                x: 1 / 2,
+                y: 1 / 30,
+            },
+            WIDTH: 1000,
+            HEIGHT: 40,
+            BG_COLOR: 0xffcccc,
+            FILL_COLOR: 0xcc0000,
+            BORDER_WIDTH: 4,
+        }
     };
 
     const {
@@ -246,6 +258,12 @@
             this.bar.fillRect(this.inner_rect.x, this.inner_rect.y, fill_width,
                 this.inner_rect.height);
         }
+
+        /*---------------------------------------------------------------------------*/
+
+        hide() {
+            this.bar.clear();
+        }
     }
 
     function moveSpriteWithinLimits(sprite, limits, {distances, distFromVelocities, performMovement}) {
@@ -375,15 +393,28 @@
 
     const {
         ENERGY_METER,
+        BOSS_HEALTHBAR,
     } = GLOBALS;
 
     class UI {
         constructor(game) {
+            //create boss health bar
+            const boss_bar_midpoint =
+                getPositionFromPercentages(BOSS_HEALTHBAR.MIDPOINT_OFFSETS, game.scale);
+            this.boss_bar = new PercentageBar(game,
+                boss_bar_midpoint,
+                BOSS_HEALTHBAR.WIDTH,
+                BOSS_HEALTHBAR.HEIGHT,
+                BOSS_HEALTHBAR.BORDER_WIDTH,
+                BOSS_HEALTHBAR.BG_COLOR,
+                BOSS_HEALTHBAR.FILL_COLOR,
+            );
+
             //create energy meter
-            const {x: midpoint_x, y: midpoint_y} =
+            const energy_meter_midpoint =
                 getPositionFromPercentages(ENERGY_METER.MIDPOINT_OFFSETS, game.scale);
             this.energy_meter = new PercentageBar(game,
-                {x: midpoint_x, y: midpoint_y},
+                energy_meter_midpoint,
                 ENERGY_METER.WIDTH,
                 ENERGY_METER.HEIGHT,
                 ENERGY_METER.BORDER_WIDTH,
@@ -394,7 +425,15 @@
 
         /*---------------------------------------------------------------------------*/
 
-        syncWithGameState(game_state) {
+        syncWithGameState(game_state, boss_enemy) {
+            //sync boss health with boss health bar
+            if (boss_enemy) {
+                const health_percentage = boss_enemy.getCurrentHealthPercentage();
+                this.boss_bar.draw(health_percentage);
+            } else {
+                this.boss_bar.hide();
+            }
+
             //sync energy with energy meter
             const energy_percentage = game_state.getEnergyPercentage();
             this.energy_meter.draw(energy_percentage);
@@ -402,11 +441,9 @@
     }
 
     function createMultipleShotSprites(game, shot_infos, reference, shot_group) {
-        const shot_sprites = [];
         shot_infos.forEach(shot_info => {
-            shot_sprites.push(createShotSprite(game, shot_info, reference, shot_group));
+            createShotSprite(game, shot_info, reference, shot_group);
         });
-        return shot_sprites;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -417,6 +454,8 @@
             x_offset, //x-offset from reference
             y_offset, //y-offset from reference
             anchor, //side (or middle) of reference to anchor shot to
+
+            damage, //the damage the shot causes
 
             //-- multiple alternatives to express shot's velocity --
 
@@ -455,6 +494,10 @@
 
         //create the shot as physics image in the game world at placement
         const shot = game.physics.add.image(shot_x, shot_y, shot_id);
+        //cache the damage directly on the sprite Object
+        if (damage) {
+            shot.damage = damage;
+        }
 
         //add shot to given physics group BEFORE setting velocity
         if (shot_group) {
@@ -621,6 +664,12 @@
 
         /*---------------------------------------------------------------------------*/
 
+        getRoutineHealthPercentage() {
+            return this.getCurrentRoutine().getHealthPercentage();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
         getNextMoves() {
             //always returns an Object!
             return this.getCurrentRoutine().getMovesCurrentTime();
@@ -701,7 +750,16 @@
         applyDamage(dmg) {
             if (this.has_hp) {
                 this.cur_hp -= dmg;
+                if (this.cur_hp < 0) {
+                    this.cur_hp = 0;
+                }
             }
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getHealthPercentage() {
+            return this.cur_hp / this.max_hp;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1084,10 +1142,30 @@
     } = GLOBALS;
 
     class Enemy {
-        constructor(game, {type, id: sprite_id, routines}, sprite_group) {
+        constructor(id, game, {type, id: sprite_id, routines}, sprite_group) {
+            this.id = id;
+            this.type = type;
             this._createEventTracker(game, routines); //sets this.event_tracker
-            this._createSprite(game, sprite_id, sprite_group); //sets this.sprite
+            this._createSprite(id, game, sprite_id, sprite_group); //sets this.sprite
             this._setMovementLimits(game, type); //sets this.limits
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        applyDamage(dmg) {
+            this.event_tracker.applyDamage(dmg);
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getCurrentHealthPercentage() {
+            return this.event_tracker.getRoutineHealthPercentage();
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        destroySprite() {
+            this.sprite.destroy();
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1102,9 +1180,11 @@
 
         /*---------------------------------------------------------------------------*/
 
-        _createSprite(game, sprite_id, sprite_group) {
+        _createSprite(id, game, sprite_id, sprite_group) {
             const {x, y} = getPositionFromPercentages(BOSS_OFFSETS, game.scale);
             const sprite = game.physics.add.image(x, y, sprite_id);
+            //log unique enemy ID directly on the sprite Object
+            sprite.id = id;
             sprite.setDepth(1);
             sprite_group.add(sprite);
             this.sprite = sprite;
@@ -1154,14 +1234,20 @@
         /*---------------------------------------------------------------------------*/
 
         update(game, shot_group) {
+            const update_info = {
+                destroy: false,
+            };
             //transition routine, stop if all routines are done
             if (!this._handleRoutineTransition()) {
-                return;
+                update_info.destroy = true;
+                return update_info;
             }
             this._updateMovement();
             this._createShots(game, shot_group);
             //has to happen last, else events get gobbled
             this.event_tracker.updateCurrentRoutine();
+
+            return update_info;
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1171,7 +1257,6 @@
                 if (this.event_tracker.existNextRoutine()) {
                     this.event_tracker.advanceRoutine();
                 } else {
-                    //TODO: enemy is done here
                     return false;
                 }
             }
@@ -1314,8 +1399,9 @@
 
     /*---------------------------------------------------------------------------*/
 
-    function handleEnemyHit(bullet) {
-        bullet.destroy();
+    function handleEnemyHit(bullet_sprite, enemy) {
+        enemy.applyDamage(bullet_sprite.damage);
+        bullet_sprite.destroy();
     }
 
     const {
@@ -1451,7 +1537,15 @@
             this.background = new Background(level_base_info.background);
 
             //management of currently active enemy sprites/routines
-            this.active_enemies = [];
+            this.active_boss = null;
+            this.active_enemies = {}; //by their unique ID
+            this.next_enemy_id = 0; //simply increment up on enemy creation
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        getEnemyById(id) {
+            return this.active_enemies[id];
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1504,35 +1598,44 @@
         /*---------------------------------------------------------------------------*/
 
         create () {
-            //groups for enemies and bullets
-            this.player_bullets = this.physics.add.group();
-            this.enemy_bullets = this.physics.add.group();
-            this.deadly_enemies = this.physics.add.group();
-
             //background
             this.background.create(this);
 
             //UI
-            this.UI.syncWithGameState(this.game_state);
+            this.UI.syncWithGameState(this.game_state, this.active_boss);
 
             //player setup
-            const player_sprite = this.player.create(this);
+            this.player_sprite = this.player.create(this);
 
-            //player collision handling
-            const player_hit = () => {
-                handleHitPlayer(this, this.player, this.game_state);
-            };
-            this.physics.add.overlap(player_sprite, this.deadly_enemies, player_hit);
-            this.physics.add.overlap(player_sprite, this.enemy_bullets, player_hit);
-
-            //enemy collision handling
-            this.physics.add.overlap(this.player_bullets, this.deadly_enemies,
-                handleEnemyHit);
+            this._setUpCollisionHandling();
 
             //start repeating timers
             this._startRepeatingTimer(ENERGY_ACCUMULATION_INTERVAL, () => {
                 this.game_state.addEnergy(ENERGY_PASSIVE_ACCUMULATION);
             });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _setUpCollisionHandling() {
+            //collision groups for enemies and bullets
+            this.player_bullets = this.physics.add.group();
+            this.enemy_bullets = this.physics.add.group();
+            this.deadly_enemies = this.physics.add.group();
+
+            //player collision handling
+            const player_hit = () => {
+                handleHitPlayer(this, this.player, this.game_state);
+            };
+            this.physics.add.overlap(this.player_sprite, this.deadly_enemies, player_hit);
+            this.physics.add.overlap(this.player_sprite, this.enemy_bullets, player_hit);
+
+            //enemy collision handling
+            const enemy_hit = (bullet_sprite, enemy_sprite) => {
+                const enemy = this.getEnemyById(enemy_sprite.id);
+                handleEnemyHit(bullet_sprite, enemy);
+            };
+            this.physics.add.overlap(this.player_bullets, this.deadly_enemies, enemy_hit);
         }
 
         /*---------------------------------------------------------------------------*/
@@ -1565,7 +1668,7 @@
             this.background.update();
 
             //UI
-            this.UI.syncWithGameState(this.game_state);
+            this.UI.syncWithGameState(this.game_state, this.active_boss);
 
             //player
             this.player.update(this, active_keys, this.player_bullets);
@@ -1573,8 +1676,11 @@
 
             //enemies by timeline
             this.createNewEnemies();
-            this.active_enemies.forEach(enemy => {
-                enemy.update(this, this.enemy_bullets);
+            Object.values(this.active_enemies).forEach(enemy => {
+                const {destroy} = enemy.update(this, this.enemy_bullets);
+                if (destroy) {
+                    this._removeEnemy(enemy);
+                }
             });
 
             //cleanup
@@ -1614,12 +1720,30 @@
             const ids_to_spawn = enemy_events[timer];
             if (!ids_to_spawn) return;
 
-            enemy_events[timer].forEach(enemy_id => {
-                const enemy_base = this.cache.json.get(enemy_id);
+            enemy_events[timer].forEach(enemy_asset_id => {
+                //get unique ID to identify enemy by
+                const enemy_id = this.next_enemy_id;
+                this.next_enemy_id++;
+                //get JSON information on the enemy
+                const enemy_base = this.cache.json.get(enemy_asset_id);
                 //create the Object to track the enemy and control its sprite
-                const enemy = new Enemy(this, enemy_base, this.deadly_enemies);
-                this.active_enemies.push(enemy);
+                const enemy = new Enemy(enemy_id, this, enemy_base, this.deadly_enemies);
+                //cache the created Object
+                this.active_enemies[enemy_id] = enemy;
+                if (enemy_base.type === 'boss') {
+                    this.active_boss = enemy;
+                }
             });
+        }
+
+        /*---------------------------------------------------------------------------*/
+
+        _removeEnemy(enemy) {
+            enemy.destroySprite();
+            delete this.active_enemies[enemy.id];
+            if (enemy.type === 'boss') {
+                this.active_boss = null;
+            }
         }
 
         /*---------------------------------------------------------------------------*/

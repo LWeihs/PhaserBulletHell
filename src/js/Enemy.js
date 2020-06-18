@@ -13,10 +13,30 @@ const {
 } = GLOBALS;
 
 export default class Enemy {
-    constructor(game, {type, id: sprite_id, routines}, sprite_group) {
+    constructor(id, game, {type, id: sprite_id, routines}, sprite_group) {
+        this.id = id;
+        this.type = type;
         this._createEventTracker(game, routines); //sets this.event_tracker
-        this._createSprite(game, sprite_id, sprite_group); //sets this.sprite
+        this._createSprite(id, game, sprite_id, sprite_group); //sets this.sprite
         this._setMovementLimits(game, type); //sets this.limits
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    applyDamage(dmg) {
+        this.event_tracker.applyDamage(dmg);
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    getCurrentHealthPercentage() {
+        return this.event_tracker.getRoutineHealthPercentage();
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    destroySprite() {
+        this.sprite.destroy();
     }
 
     /*---------------------------------------------------------------------------*/
@@ -31,9 +51,11 @@ export default class Enemy {
 
     /*---------------------------------------------------------------------------*/
 
-    _createSprite(game, sprite_id, sprite_group) {
+    _createSprite(id, game, sprite_id, sprite_group) {
         const {x, y} = getPositionFromPercentages(BOSS_OFFSETS, game.scale);
         const sprite = game.physics.add.image(x, y, sprite_id);
+        //log unique enemy ID directly on the sprite Object
+        sprite.id = id;
         sprite.setDepth(1);
         sprite_group.add(sprite);
         this.sprite = sprite;
@@ -83,14 +105,20 @@ export default class Enemy {
     /*---------------------------------------------------------------------------*/
 
     update(game, shot_group) {
+        const update_info = {
+            destroy: false,
+        };
         //transition routine, stop if all routines are done
         if (!this._handleRoutineTransition()) {
-            return;
+            update_info.destroy = true;
+            return update_info;
         }
         this._updateMovement();
         this._createShots(game, shot_group);
         //has to happen last, else events get gobbled
         this.event_tracker.updateCurrentRoutine();
+
+        return update_info;
     }
 
     /*---------------------------------------------------------------------------*/
@@ -100,7 +128,6 @@ export default class Enemy {
             if (this.event_tracker.existNextRoutine()) {
                 this.event_tracker.advanceRoutine();
             } else {
-                //TODO: enemy is done here
                 return false;
             }
         }

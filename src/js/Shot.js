@@ -1,11 +1,9 @@
 import {divideDistXAndY} from "./GeometryHelpers";
 
 function createMultipleShotSprites(game, shot_infos, reference, shot_group) {
-    const shot_sprites = [];
     shot_infos.forEach(shot_info => {
-        shot_sprites.push(createShotSprite(game, shot_info, reference, shot_group));
+        createShotSprite(game, shot_info, reference, shot_group);
     });
-    return shot_sprites;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -16,6 +14,8 @@ function createShotSprite(game, shot_info, reference, shot_group) {
         x_offset, //x-offset from reference
         y_offset, //y-offset from reference
         anchor, //side (or middle) of reference to anchor shot to
+
+        damage, //the damage the shot causes
 
         //-- multiple alternatives to express shot's velocity --
 
@@ -57,6 +57,10 @@ function createShotSprite(game, shot_info, reference, shot_group) {
 
     //create the shot as physics image in the game world at placement
     const shot = game.physics.add.image(shot_x, shot_y, shot_id);
+    //cache the damage directly on the sprite Object
+    if (damage) {
+        shot.damage = damage;
+    }
 
     //add shot to given physics group BEFORE setting velocity
     if (shot_group) {

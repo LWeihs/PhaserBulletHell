@@ -65,7 +65,15 @@ export default class FightScene extends Phaser.Scene {
         this.background = new Background(level_base_info.background);
 
         //management of currently active enemy sprites/routines
-        this.active_enemies = [];
+        this.active_boss = null;
+        this.active_enemies = {}; //by their unique ID
+        this.next_enemy_id = 0; //simply increment up on enemy creation
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    getEnemyById(id) {
+        return this.active_enemies[id];
     }
 
     /*---------------------------------------------------------------------------*/
@@ -118,35 +126,44 @@ export default class FightScene extends Phaser.Scene {
     /*---------------------------------------------------------------------------*/
 
     create () {
-        //groups for enemies and bullets
-        this.player_bullets = this.physics.add.group();
-        this.enemy_bullets = this.physics.add.group();
-        this.deadly_enemies = this.physics.add.group();
-
         //background
         this.background.create(this);
 
         //UI
-        this.UI.syncWithGameState(this.game_state);
+        this.UI.syncWithGameState(this.game_state, this.active_boss);
 
         //player setup
-        const player_sprite = this.player.create(this);
+        this.player_sprite = this.player.create(this);
 
-        //player collision handling
-        const player_hit = () => {
-            handleHitPlayer(this, this.player, this.game_state);
-        };
-        this.physics.add.overlap(player_sprite, this.deadly_enemies, player_hit);
-        this.physics.add.overlap(player_sprite, this.enemy_bullets, player_hit);
-
-        //enemy collision handling
-        this.physics.add.overlap(this.player_bullets, this.deadly_enemies,
-            handleEnemyHit);
+        this._setUpCollisionHandling();
 
         //start repeating timers
         this._startRepeatingTimer(ENERGY_ACCUMULATION_INTERVAL, () => {
             this.game_state.addEnergy(ENERGY_PASSIVE_ACCUMULATION);
         });
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    _setUpCollisionHandling() {
+        //collision groups for enemies and bullets
+        this.player_bullets = this.physics.add.group();
+        this.enemy_bullets = this.physics.add.group();
+        this.deadly_enemies = this.physics.add.group();
+
+        //player collision handling
+        const player_hit = () => {
+            handleHitPlayer(this, this.player, this.game_state);
+        };
+        this.physics.add.overlap(this.player_sprite, this.deadly_enemies, player_hit);
+        this.physics.add.overlap(this.player_sprite, this.enemy_bullets, player_hit);
+
+        //enemy collision handling
+        const enemy_hit = (bullet_sprite, enemy_sprite) => {
+            const enemy = this.getEnemyById(enemy_sprite.id);
+            handleEnemyHit(bullet_sprite, enemy);
+        };
+        this.physics.add.overlap(this.player_bullets, this.deadly_enemies, enemy_hit);
     }
 
     /*---------------------------------------------------------------------------*/
@@ -179,7 +196,7 @@ export default class FightScene extends Phaser.Scene {
         this.background.update();
 
         //UI
-        this.UI.syncWithGameState(this.game_state);
+        this.UI.syncWithGameState(this.game_state, this.active_boss);
 
         //player
         this.player.update(this, active_keys, this.player_bullets);
@@ -187,8 +204,11 @@ export default class FightScene extends Phaser.Scene {
 
         //enemies by timeline
         this.createNewEnemies();
-        this.active_enemies.forEach(enemy => {
-            enemy.update(this, this.enemy_bullets);
+        Object.values(this.active_enemies).forEach(enemy => {
+            const {destroy} = enemy.update(this, this.enemy_bullets);
+            if (destroy) {
+                this._removeEnemy(enemy);
+            }
         });
 
         //cleanup
@@ -228,12 +248,30 @@ export default class FightScene extends Phaser.Scene {
         const ids_to_spawn = enemy_events[timer];
         if (!ids_to_spawn) return;
 
-        enemy_events[timer].forEach(enemy_id => {
-            const enemy_base = this.cache.json.get(enemy_id);
+        enemy_events[timer].forEach(enemy_asset_id => {
+            //get unique ID to identify enemy by
+            const enemy_id = this.next_enemy_id;
+            this.next_enemy_id++;
+            //get JSON information on the enemy
+            const enemy_base = this.cache.json.get(enemy_asset_id);
             //create the Object to track the enemy and control its sprite
-            const enemy = new Enemy(this, enemy_base, this.deadly_enemies);
-            this.active_enemies.push(enemy);
+            const enemy = new Enemy(enemy_id, this, enemy_base, this.deadly_enemies);
+            //cache the created Object
+            this.active_enemies[enemy_id] = enemy;
+            if (enemy_base.type === 'boss') {
+                this.active_boss = enemy;
+            }
         });
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    _removeEnemy(enemy) {
+        enemy.destroySprite();
+        delete this.active_enemies[enemy.id];
+        if (enemy.type === 'boss') {
+            this.active_boss = null;
+        }
     }
 
     /*---------------------------------------------------------------------------*/

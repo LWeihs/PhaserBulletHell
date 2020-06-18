@@ -36,6 +36,12 @@ export default class EnemyEventTracker {
 
     /*---------------------------------------------------------------------------*/
 
+    getRoutineHealthPercentage() {
+        return this.getCurrentRoutine().getHealthPercentage();
+    }
+
+    /*---------------------------------------------------------------------------*/
+
     getNextMoves() {
         //always returns an Object!
         return this.getCurrentRoutine().getMovesCurrentTime();

@@ -8,8 +8,9 @@ function handleHitPlayer(game, player, game_state) {
 
 /*---------------------------------------------------------------------------*/
 
-function handleEnemyHit(bullet) {
-    bullet.destroy();
+function handleEnemyHit(bullet_sprite, enemy) {
+    enemy.applyDamage(bullet_sprite.damage);
+    bullet_sprite.destroy();
 }
 
 /*---------------------------------------------------------------------------*/

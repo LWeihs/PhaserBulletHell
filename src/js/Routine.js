@@ -31,7 +31,16 @@ export default class Routine {
     applyDamage(dmg) {
         if (this.has_hp) {
             this.cur_hp -= dmg;
+            if (this.cur_hp < 0) {
+                this.cur_hp = 0;
+            }
         }
+    }
+
+    /*---------------------------------------------------------------------------*/
+
+    getHealthPercentage() {
+        return this.cur_hp / this.max_hp;
     }
 
     /*---------------------------------------------------------------------------*/

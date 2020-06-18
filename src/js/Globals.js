@@ -69,7 +69,7 @@ const GLOBALS = {
 
     /** PLAYER SPECIALS **/
 
-    PLAYER_BLINK_DISTANCE: 100,
+    PLAYER_BLINK_DISTANCE: 300,
 
     /** GAME STATE INFORMATION **/
 
@@ -87,6 +87,18 @@ const GLOBALS = {
         FILL_COLOR: 0x29a329,
         BORDER_WIDTH: 4,
     },
+
+    BOSS_HEALTHBAR: {
+        MIDPOINT_OFFSETS: {
+            x: 1 / 2,
+            y: 1 / 30,
+        },
+        WIDTH: 1000,
+        HEIGHT: 40,
+        BG_COLOR: 0xffcccc,
+        FILL_COLOR: 0xcc0000,
+        BORDER_WIDTH: 4,
+    }
 };
 
 export default GLOBALS;
